@@ -21,6 +21,8 @@ import com.github.nrfr.data.CountryPresets
 import com.github.nrfr.data.PresetCarriers
 import com.github.nrfr.manager.CarrierConfigManager
 import com.github.nrfr.model.SimCardInfo
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,14 +38,26 @@ fun MainScreen(onShowAbout: () -> Unit) {
     var isCountryCodeMenuExpanded by remember { mutableStateOf(false) }
     var isCarrierMenuExpanded by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableStateOf(0) }
+    var simCards by remember { mutableStateOf<List<SimCardInfo>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var isApplying by remember { mutableStateOf(false) }
+    var simError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
-    // 获取实际的 SIM 卡信息
-    val simCards = remember(context, refreshTrigger) { CarrierConfigManager.getSimCards(context) }
-
-    // 当 simCards 更新时，更新选中的 SIM 卡信息
-    LaunchedEffect(simCards, selectedSimCard) {
-        if (selectedSimCard != null) {
-            selectedSimCard = simCards.find { it.slot == selectedSimCard?.slot }
+    LaunchedEffect(context, refreshTrigger) {
+        isLoading = true
+        simError = null
+        try {
+            simCards = CarrierConfigManager.getSimCards(context)
+            selectedSimCard = simCards.find { it.subId == selectedSimCard?.subId }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            simCards = emptyList()
+            selectedSimCard = null
+            simError = error.message ?: "读取 SIM 卡失败"
+        } finally {
+            isLoading = false
         }
     }
 
@@ -82,6 +96,15 @@ fun MainScreen(onShowAbout: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (isLoading || isApplying) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+            simError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { refreshTrigger += 1 }, enabled = !isLoading && !isApplying) {
+                    Text("重新读取 SIM 卡")
+                }
+            }
             // SIM卡选择
             SimCardSelector(
                 simCards = simCards,
@@ -155,39 +178,51 @@ fun MainScreen(onShowAbout: () -> Unit) {
                 customCountryCode = customCountryCode,
                 selectedCarrier = selectedCarrier,
                 customCarrierName = customCarrierName,
-                onReset = {
-                    try {
-                        CarrierConfigManager.resetCarrierConfig(it.subId)
-                        Toast.makeText(context, "设置已还原", Toast.LENGTH_SHORT).show()
-                        refreshTrigger += 1
-                        selectedCountryCode = ""
-                        selectedCarrier = null
-                        customCarrierName = ""
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "还原失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                enabled = !isLoading && !isApplying,
+                onReset = { simCard ->
+                    isApplying = true
+                    scope.launch {
+                        try {
+                            val persistent = CarrierConfigManager.resetCarrierConfig(context, simCard.subId)
+                            val message = if (persistent) "设置已还原" else "临时覆盖已清除，请确认重启后的配置"
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                            selectedCountryCode = ""
+                            customCountryCode = ""
+                            selectedCarrier = null
+                            customCarrierName = ""
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            Toast.makeText(context, "还原失败: ${error.message}", Toast.LENGTH_LONG).show()
+                        } finally {
+                            isApplying = false
+                            refreshTrigger += 1
+                        }
                     }
                 },
                 onSave = { simCard ->
-                    try {
-                        val carrierName = if (selectedCarrier?.name == "自定义") {
-                            customCarrierName.takeIf { it.isNotEmpty() }
-                        } else {
-                            selectedCarrier?.displayName
+                    val carrierName = if (selectedCarrier?.name == "自定义") {
+                        customCarrierName.takeIf { it.isNotEmpty() }
+                    } else {
+                        selectedCarrier?.displayName
+                    }
+                    val countryCode = if (isCustomCountryCode) customCountryCode else selectedCountryCode
+                    isApplying = true
+                    scope.launch {
+                        try {
+                            val persistent = CarrierConfigManager.setCarrierConfig(
+                                context, simCard.subId, countryCode, carrierName,
+                            )
+                            val message = if (persistent) "设置已保存" else "设置已生效，重启或更换 SIM 后可能需要重新应用"
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            Toast.makeText(context, "应用失败: ${error.message}", Toast.LENGTH_LONG).show()
+                        } finally {
+                            isApplying = false
+                            refreshTrigger += 1
                         }
-                        val countryCode = if (isCustomCountryCode) {
-                            customCountryCode.takeIf { it.length == 2 }
-                        } else {
-                            selectedCountryCode
-                        }
-                        CarrierConfigManager.setCarrierConfig(
-                            simCard.subId,
-                            countryCode,
-                            carrierName
-                        )
-                        Toast.makeText(context, "设置已保存", Toast.LENGTH_SHORT).show()
-                        refreshTrigger += 1
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
                 }
             )
@@ -460,6 +495,7 @@ private fun ActionButtons(
     customCountryCode: String,
     selectedCarrier: PresetCarriers.CarrierPreset?,
     customCarrierName: String,
+    enabled: Boolean,
     onReset: (SimCardInfo) -> Unit,
     onSave: (SimCardInfo) -> Unit
 ) {
@@ -471,7 +507,7 @@ private fun ActionButtons(
         OutlinedButton(
             onClick = { selectedSimCard?.let(onReset) },
             modifier = Modifier.weight(1f),
-            enabled = selectedSimCard != null
+            enabled = enabled && selectedSimCard != null
         ) {
             Text("还原设置")
         }
@@ -480,7 +516,7 @@ private fun ActionButtons(
         Button(
             onClick = { selectedSimCard?.let(onSave) },
             modifier = Modifier.weight(1f),
-            enabled = selectedSimCard != null && (
+            enabled = enabled && selectedSimCard != null && (
                     (isCustomCountryCode && customCountryCode.length == 2) ||
                             (!isCustomCountryCode && selectedCountryCode.isNotEmpty()) ||
                             (selectedCarrier != null && (selectedCarrier.name != "自定义" || customCarrierName.isNotEmpty()))

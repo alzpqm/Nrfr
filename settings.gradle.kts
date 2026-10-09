@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Nrfr"
 include(":app")
+include(":hidden-api")

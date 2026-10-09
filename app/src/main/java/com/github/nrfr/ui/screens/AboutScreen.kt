@@ -2,175 +2,89 @@ package com.github.nrfr.ui.screens
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.github.nrfr.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
-
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                            modifier = Modifier.size(48.dp),
-                            contentDescription = "App Icon",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("关于")
-                    }
-                },
+                title = { Text("關於 Nrfr") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
-                }
+                },
             )
-        }
-    ) { innerPadding ->
+        },
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
-                    .weight(1f, fill = false),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // 应用信息
-                Card(
-                    modifier = Modifier.fillMaxWidth()
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            "功能介绍",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            "• 修改 SIM 卡的国家码配置，可用于解除部分应用的地区限制\n" +
-                                    "• 帮助使用海外 SIM 卡时获得更好的本地化体验\n" +
-                                    "• 解决部分应用识别 SIM 卡地区错误的问题\n" +
-                                    "• 无需 Root 权限，无需修改系统文件，安全且可随时还原\n" +
-                                    "• 支持 Android 8 及以上系统版本\n" +
-                                    "• 支持双卡设备，可分别配置不同国家码",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
+                    Text("Nrfr · Android 17 相容版", style = MaterialTheme.typography.titleMedium)
+                    Text("透過 Shizuku、免 root 調整系統回報的 SIM 國家碼及電信商名稱，支援分別套用與還原。")
+                    Text("套用後會核對系統回報的設定。Android 16／17 使用臨時覆寫，重啟或更換 SIM 後可能需要重新套用。")
+                    Text("本工具不改寫 SIM 本身的 MCC／MNC。")
                 }
-
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-                // 作者信息
-                Text(
-                    "作者信息",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("作者: Antkites")
-                        Text(
-                            "GitHub: Ackites",
-                            modifier = Modifier.clickable {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Ackites"))
-                                )
-                            },
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            "X (Twitter): @actkites",
-                            modifier = Modifier.clickable {
-                                context.startActivity(
-                                    Intent(
-                                        Intent.ACTION_VIEW,
-                                        Uri.parse("https://x.com/intent/follow?screen_name=actkites")
-                                    )
-                                )
-                            },
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-                // 开源信息
-                Text(
-                    "开源信息",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            "本项目已在 GitHub 开源",
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(
-                            "访问项目主页",
-                            color = MaterialTheme.colorScheme.primary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    context.startActivity(
-                                        Intent(
-                                            Intent.ACTION_VIEW,
-                                            Uri.parse("https://github.com/Ackites/Nrfr")
-                                        )
-                                    )
-                                }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // 版权信息
-                Text(
-                    "© 2024 Antkites. All rights reserved.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("此版本由 alzpqm 維護", style = MaterialTheme.typography.titleMedium)
+                    AboutLink("專案首頁", "https://github.com/alzpqm/Nrfr")
+                    AboutLink("下載版本", "https://github.com/alzpqm/Nrfr/releases")
+                    AboutLink("回報問題", "https://github.com/alzpqm/Nrfr/issues")
+                }
+            }
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("開源來源", style = MaterialTheme.typography.titleMedium)
+                    Text("基於 Antkites 的 Nrfr，保留原始授權與作者歸屬。")
+                    AboutLink("原始專案：Ackites/Nrfr", "https://github.com/Ackites/Nrfr")
+                    AboutLink("實作參考：carrier-ims-for-pixel", "https://github.com/ryfineZ/carrier-ims-for-pixel")
+                    AboutLink("Apache License 2.0", "https://github.com/alzpqm/Nrfr/blob/master/LICENSE")
+                }
+            }
+            Text(
+                "原始程式 © 2024 Antkites · Apache License 2.0",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+    }
+}
+
+@Composable
+private fun AboutLink(label: String, url: String) {
+    val context = LocalContext.current
+    TextButton(onClick = {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }) {
+        Text(label)
     }
 }

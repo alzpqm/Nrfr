@@ -3,9 +3,12 @@
 /local.properties
 /.idea
 .DS_Store
-/build
+build/
 /captures
 .externalNativeBuild
 .cxx
 local.properties
 *.log
+/nrfr-client/frontend/node_modules/
+/nrfr-client/frontend/dist/
+*.tsbuildinfo

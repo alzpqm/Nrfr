@@ -13,36 +13,28 @@ import com.github.nrfr.ui.screens.AboutScreen
 import com.github.nrfr.ui.screens.MainScreen
 import com.github.nrfr.ui.screens.ShizukuNotReadyScreen
 import com.github.nrfr.ui.theme.NrfrTheme
-import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.Shizuku
 
 class MainActivity : ComponentActivity() {
     private var isShizukuReady by mutableStateOf(false)
     private var showAbout by mutableStateOf(false)
+    private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+        isShizukuReady = grantResult == PackageManager.PERMISSION_GRANTED
+        if (!isShizukuReady) {
+            Toast.makeText(this, "需要 Shizuku 权限才能运行", Toast.LENGTH_LONG).show()
+        }
+    }
+    private val binderListener = Shizuku.OnBinderReceivedListener { checkShizukuStatus() }
+    private val binderDeadListener = Shizuku.OnBinderDeadListener { isShizukuReady = false }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // 初始化 Hidden API 访问
-        HiddenApiBypass.addHiddenApiExemptions("L")
-        HiddenApiBypass.addHiddenApiExemptions("I")
-
-        // 检查 Shizuku 状态
-        checkShizukuStatus()
-
-        // 添加 Shizuku 权限监听器
-        Shizuku.addRequestPermissionResultListener { _, grantResult ->
-            isShizukuReady = grantResult == PackageManager.PERMISSION_GRANTED
-            if (!isShizukuReady) {
-                Toast.makeText(this, "需要 Shizuku 权限才能运行", Toast.LENGTH_LONG).show()
-            }
-        }
-
-        // 添加 Shizuku 绑定监听器
-        Shizuku.addBinderReceivedListener {
-            checkShizukuStatus()
-        }
+        Shizuku.addRequestPermissionResultListener(permissionListener)
+        Shizuku.addBinderReceivedListenerSticky(binderListener)
+        Shizuku.addBinderDeadListener(binderDeadListener)
+        if (!Shizuku.pingBinder()) checkShizukuStatus()
 
         setContent {
             NrfrTheme {
@@ -58,7 +50,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkShizukuStatus() {
-        isShizukuReady = if (Shizuku.getBinder() == null) {
+        isShizukuReady = if (!Shizuku.pingBinder()) {
             Toast.makeText(this, "请先安装并启用 Shizuku", Toast.LENGTH_LONG).show()
             false
         } else {
@@ -72,7 +64,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Shizuku.removeRequestPermissionResultListener { _, _ -> }
-        Shizuku.removeBinderReceivedListener { }
+        Shizuku.removeRequestPermissionResultListener(permissionListener)
+        Shizuku.removeBinderReceivedListener(binderListener)
+        Shizuku.removeBinderDeadListener(binderDeadListener)
     }
 }

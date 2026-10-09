@@ -3,6 +3,7 @@
           xmlns:tools="http://schemas.android.com/tools">
 
     <application
+            android:name=".NrfrApplication"
             android:allowBackup="true"
             android:dataExtractionRules="@xml/data_extraction_rules"
             android:fullBackupContent="@xml/backup_rules"
@@ -32,5 +33,9 @@
                 android:exported="true"
                 android:permission="android.permission.INTERACT_ACROSS_USERS_FULL"/>
     </application>
+
+    <instrumentation
+            android:name=".manager.CarrierConfigInstrumentation"
+            android:targetPackage="${applicationId}"/>
 
 </manifest>

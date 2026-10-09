@@ -73,20 +73,18 @@ jobs:
       # 设置 Android SDK
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '16111833'
 
-      # 下载替换 android.jar
-      - name: Download android.jar
-        run: |
-          mkdir -p $ANDROID_HOME/platforms/android-34
-          curl -L https://raw.githubusercontent.com/Reginer/aosp-android-jar/refs/heads/main/android-34/android.jar -o $ANDROID_HOME/platforms/android-34/android.jar
+      - name: Install Android 17 SDK
+        run: sdkmanager 'platforms;android-37.2' 'build-tools;37.0.0'
         shell: bash
 
       # 构建 Android APK
       - name: Build Android APK
         run: |
-          gradle wrapper
           chmod +x ./gradlew
-          ./gradlew assembleDebug
+          ./gradlew :app:testDebugUnitTest :app:assembleDebug
         shell: bash
 
       # 设置 Go 环境

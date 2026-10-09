@@ -7,13 +7,13 @@
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
   "author": {
-    "name": "Antkites"
+    "name": "alzpqm"
   },
   "info": {
-    "companyName": "Antkites",
+    "companyName": "alzpqm",
     "productName": "Nrfr Client",
-    "productVersion": "1.0.2",
-    "copyright": "Copyright © 2024 Antkites",
-    "comments": "Nrfr 快速启动工具"
+    "productVersion": "1.0.4",
+    "copyright": "Copyright © 2024 Antkites; fork maintained by alzpqm",
+    "comments": "Nrfr Android 17 相容版快速啟動工具"
   }
 }
