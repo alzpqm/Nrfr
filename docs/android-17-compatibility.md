@@ -37,7 +37,7 @@ sequenceDiagram
 這些 token 限制是實現上的約束，不是針對同 UID 惡意代碼的安全邊界。
 
 Android 10+ 使用上述路徑。Android 8 / 9 保留直接通過 Shizuku 調用的相容路徑。
-國家碼覆寫項是否被系統採用取決於平臺實現；寫入成功與第三方應用程式認可該地區是不同的結果。
+國家碼覆寫項是否被系統採用取決於平台實現；寫入成功與第三方應用程式認可該地區是不同的結果。
 
 ## 持久性與還原
 
@@ -49,7 +49,7 @@ Android 16 / 17 優先使用 `persistent=false`，避免普通應用程式的持
 還原可能清除其他工具對同一 SIM 的覆寫，應在重新使用 IMS 工具前核對其設定。
 本改版不添加自動啟動或後臺重新套用功能。
 
-## 構建驗證
+## 建置驗證
 
 使用 JDK 17+、Android SDK Platform 37.2、Build Tools 37.0.0 和 Gradle 9.6.0，在根目錄執行：
 
@@ -57,19 +57,19 @@ Android 16 / 17 優先使用 `persistent=false`，避免普通應用程式的持
 ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease
 ```
 
-`hidden-api` 模塊僅提供編譯籤名；`compileOnly` 保證裝置上的框架類處理真實 Binder 協議。
+`hidden-api` 模組僅提供編譯用的介面簽名；`compileOnly` 保證裝置上的框架類處理真實 Binder 協議。
 不需要下載完整隱藏 API `android.jar`，也不會把這些 `android.*` 樁類放進應用程式 dex。
-新增單元測試覆寫 Android 16 / 17 寫入策略、還原與受限回退，以及 token 過期、重放、跨進程和並發消費。
+新增單元測試涵蓋 Android 16 / 17 寫入策略、還原與受限回退，以及 token 過期、重放、跨進程和並發消費。
 
-編譯使用官方最新可用的非 beta 平臺包 `platforms;android-37.2`；targetSdk 為 37。
-AGP 9.4.1 與 Gradle 9.6.0 配套，採用 AGP 內置 Kotlin 2.2.10 與相同版本的 Compose 編譯插件。
+編譯使用官方最新可用的非 beta 平台包 `platforms;android-37.2`；targetSdk 為 37。
+AGP 9.4.1 與 Gradle 9.6.0 配套，採用 AGP 內建 Kotlin 2.2.10 與相同版本的 Compose 編譯插件。
 設定依據：[Android 17 SDK](https://developer.android.com/about/versions/17/setup-sdk)、
 [AGP 9.4 相容性](https://developer.android.com/build/releases/agp-9-4-0-release-notes)、
-[內置 Kotlin 遷移](https://developer.android.com/build/migrate-to-built-in-kotlin)。
+[內建 Kotlin 遷移](https://developer.android.com/build/migrate-to-built-in-kotlin)。
 
 ## 真機驗證
 
-1. 安裝構建的 APK，啟動 Shizuku 並授權 Nrfr。不同籤名的 APK 不能直接覆寫舊版；如安裝器提示籤名衝突，需要先卸載舊版再安裝。
+1. 安裝建置的 APK，啟動 Shizuku 並授權 Nrfr。不同簽章的 APK 不能直接覆寫舊版；如安裝器提示簽章衝突，需要先移除舊版再安裝。
 2. 確認實體 SIM / eSIM 列表、SIM 槽位及目前設定正確。
 3. 選擇目標 SIM，設定例如 `US` 與一個電信業者名稱。成功後目前設定應顯示 `us` 和所選名稱。
 4. 如果顯示回讀不一致，記錄手機型號、完整系統 build 與錯誤文字；此時不能視為已成功套用。
@@ -78,4 +78,4 @@ AGP 9.4.1 與 Gradle 9.6.0 配套，採用 AGP 內置 Kotlin 2.2.10 與相同版
 7. 重新啟動裝置重新啟動 Shizuku，核對非持久覆寫的生命周期；必要時手動重新套用。
 
 可使用電腦執行 `adb logcat -s NrfrCarrierConfig` 取得本次操作的完整異常。
-若回讀成功但目標應用程式行為未改變，再分別檢查該應用程式版本、緩存、賬號與網路條件。
+若回讀成功但目標應用程式行為未改變，再分別檢查該應用程式版本、快取、帳號與網路條件。
