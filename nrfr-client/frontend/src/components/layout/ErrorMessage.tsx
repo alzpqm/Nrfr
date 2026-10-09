@@ -15,7 +15,7 @@ export const ErrorMessage: React.FC<Props> = ({message, onClose}) => {
                 className="ml-2 text-red-500 hover:text-red-600"
                 onClick={onClose}
             >
-                关闭
+                關閉
             </button>
         </div>
     );

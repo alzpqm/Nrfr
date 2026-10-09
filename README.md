@@ -1,12 +1,20 @@
 # Nrfr — Android 17 相容版
 
-透過 **Shizuku、免 root** 調整系統回報的 SIM 國家碼與電信商顯示名稱，支援各 SIM 分別套用及還原。
+透過 **Shizuku、免 root** 調整系統回報的 SIM 國家碼、電信業者名稱與 MCC／MNC 代碼，支援各 SIM 分別套用及還原。
 
 本專案由 **Nrfr 維護團隊** 維護，基於 [Ackites/Nrfr](https://github.com/Ackites/Nrfr)。本 fork 聚焦於較新 Android 系統的套用相容性、正確的成功／失敗回報與標準 SDK 建置。
 
 [下載 APK](https://github.com/alzpqm/Nrfr/releases) · [回報問題](https://github.com/alzpqm/Nrfr/issues) · [原始碼](https://github.com/alzpqm/Nrfr)
 
-## 這個版本做了什麼
+## 1.1.0 新增功能
+
+- 自訂 5／6 位電信業者代碼，例如 `45402`、`23410`、`310260`；保留 MNC 前導零。
+- 套用前備份所選 SIM 當時的代碼與名稱，還原時核對回讀值。
+- 提供 **177 組代碼、45 個國家／地區**預設，可搜尋名稱、地區及代碼。
+- Android App 與桌面快速啟動工具完整改用正體中文。
+- 顯示 SIM 讀取值、訂閱資料及連線網路代碼，方便確認目標 App 讀取的來源。
+
+## Android 17 相容性修復
 
 - 修正較新系統直接以 shell 身分寫入時出現的 `overrideConfig cannot be invoked by shell`。
 - 使用 Shizuku 臨時委派必要的電話權限，以應用自己的 UID 寫入；操作結束後釋放權限。
@@ -21,13 +29,18 @@
 
 1. 從[此 fork 的 Releases](https://github.com/alzpqm/Nrfr/releases) 下載 APK。
 2. 安裝並啟動 [Shizuku](https://shizuku.rikka.app/)，開啟 Nrfr 後授權。
-3. 選擇需要調整的 SIM，設定兩位英文字母國家碼，例如 `US` 或 `JP`；可同時設定電信商名稱。
-4. 點選「保存生效」，等待系統回讀完成，再確認目前設定。
-5. 如需還原，選擇同一張 SIM，點選「還原設定」。
+3. 選擇需要調整的 SIM，設定兩位英文字母國家碼，例如 `US` 或 `JP`；可同時設定電信業者名稱。也可選擇預設電信業者自動填入欄位。
+4. 若要修改代碼，勾選「修改 SIM 電信業者代碼」，輸入 5／6 位 MCC＋MNC；留意系統可能重載電信設定。
+5. 點選「套用設定」，等待系統回讀完成，再確認目前設定。
+6. 如需還原，選擇同一張 SIM，點選「還原設定」。
 
 若安裝器提示 APK 簽章不一致，請先移除舊版再安裝。移除 App 不會自動還原系統的 CarrierConfig 覆寫。
 
-這個工具修改的是 **Android 的電信商設定覆寫**，不會改寫 SIM 本身的 MCC／MNC。套用成功也不代表特定第三方 App 一定會接受該地區設定。
+代碼覆寫的目標是 **Android SIM 讀取介面**（`TelephonyManager.getSimOperator()`），不會改寫實體 SIM 內容或基地台註冊網路。其他 App 若讀取訂閱資料、連線網路、IMSI、快取或伺服器資料，可能仍顯示原值；套用成功不代表任何特定 App 都會接受該地區設定。
+
+首次修改代碼時，備份的是此 App 當時讀到的值；若先前已由其他工具覆寫，還原會回到該值。系統未提供完整清除介面時，App 會先回復代碼，再提示重啟手機結束測試覆寫狀態。解除安裝會失去本機備份，請先還原或重啟手機。
+
+代碼覆寫需要 Android 10 以上，與國家碼／名稱功能的 Android 8 最低版本分開。預設清單包含相容代碼及已合併業者的舊代碼，不代表所有條目目前都在營運。詳見 [代碼覆寫與預設清單](docs/mcc-mnc.md)。
 
 「還原設定」會清除所選 SIM 的 CarrierConfig 覆寫，也可能清除其他工具對同一張 SIM 設定的覆寫。若系統只允許清除臨時設定，App 會提示你核對重啟後的結果。
 

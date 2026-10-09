@@ -17,17 +17,17 @@ internal object CarrierConfigAccess {
 
     private fun service(name: String, interfaceName: String, asShell: Boolean): Any {
         val binder = ServiceManager.getService(name)
-            ?: error("系统服务不可用: $name")
+            ?: error("系統服務不可用: $name")
         return invoke {
             Class.forName("$interfaceName\$Stub")
                 .getMethod("asInterface", IBinder::class.java)
                 .invoke(null, if (asShell) ShizukuBinderWrapper(binder) else binder)
-                ?: error("系统接口不可用: $interfaceName")
+                ?: error("系統接口不可用: $interfaceName")
         }
     }
 
     fun override(subId: Int, values: PersistableBundle?, persistent: Boolean, asShell: Boolean) {
-        require(subId >= 0) { "无效的 SIM 订阅 ID: $subId" }
+        require(subId >= 0) { "無效的 SIM 訂閱 ID: $subId" }
         val loader = service("carrier_config", "com.android.internal.telephony.ICarrierConfigLoader", asShell)
         val method = try {
             loader.javaClass.getMethod("overrideConfig", Int::class.javaPrimitiveType,
@@ -47,14 +47,14 @@ internal object CarrierConfigAccess {
     fun read(context: Context, subId: Int, asShell: Boolean = false): PersistableBundle {
         if (!asShell) {
             return context.getSystemService(SystemCarrierConfigManager::class.java)
-                ?.getConfigForSubId(subId) ?: error("无法读取 SIM 配置: $subId")
+                ?.getConfigForSubId(subId) ?: error("無法讀取 SIM 設定: $subId")
         }
         val loader = service("carrier_config", "com.android.internal.telephony.ICarrierConfigLoader", true)
         return invoke {
             val method = loader.javaClass.getMethod("getConfigForSubId", Int::class.javaPrimitiveType,
                 String::class.java)
             method.invoke(loader, subId, "com.android.shell") as? PersistableBundle
-                ?: error("无法读取 SIM 配置: $subId")
+                ?: error("無法讀取 SIM 設定: $subId")
         }
     }
 
@@ -76,9 +76,9 @@ internal object CarrierConfigAccess {
     }
 
     fun displayConfig(config: PersistableBundle): Map<String, String> = buildMap {
-        config.getString(COUNTRY_ISO)?.takeIf { it.isNotEmpty() }?.let { put("国家码", it) }
+        config.getString(COUNTRY_ISO)?.takeIf { it.isNotEmpty() }?.let { put("國家碼", it) }
         if (config.getBoolean(CARRIER_NAME_OVERRIDE, false)) {
-            config.getString(CARRIER_NAME)?.let { put("运营商名称", it) }
+            config.getString(CARRIER_NAME)?.let { put("電信業者名稱", it) }
         }
     }
 

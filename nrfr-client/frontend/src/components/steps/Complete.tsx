@@ -16,7 +16,7 @@ export const Complete: React.FC<Props> = ({device}) => {
             setError('');
             await StartNrfr();
         } catch (err: any) {
-            setError(err.message || '启动 Nrfr 失败');
+            setError(err.message || '啟動 Nrfr 失敗');
         } finally {
             setIsStarting(false);
         }
@@ -24,13 +24,13 @@ export const Complete: React.FC<Props> = ({device}) => {
 
     return (
         <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-center">设置完成</h2>
+            <h2 className="text-xl font-semibold text-center">設定完成</h2>
             <div className="text-center text-sm text-gray-600 mb-4">
-                当前设备：{device.model || '未知设备'} ({device.serial})
+                目前裝置：{device.model || '未知裝置'} ({device.serial})
             </div>
             <div className="p-4 bg-white/50 backdrop-blur-sm rounded-lg text-center">
                 <div className="text-green-500 text-lg">✓ 全部完成</div>
-                <div className="text-gray-600 mt-2">现在可以开始使用了</div>
+                <div className="text-gray-600 mt-2">現在可以開始使用了</div>
             </div>
 
             {error && (
@@ -56,10 +56,10 @@ export const Complete: React.FC<Props> = ({device}) => {
                                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
                             </div>
-                            启动中...
+                            啟動中...
                         </>
                     ) : (
-                        '启动 Nrfr'
+                        '啟動 Nrfr'
                     )}
                 </button>
             </div>

@@ -17,10 +17,10 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
     const [showLoading, setShowLoading] = useState(false);
     const loadingTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
-    // 处理加载状态的延迟显示
+    // 處理載入狀態的延遲顯示
     useEffect(() => {
         if (isLoading) {
-            // 延迟显示加载状态，避免闪烁
+            // 延遲顯示載入狀態，避免閃爍
             loadingTimer.current = setTimeout(() => {
                 setShowLoading(true);
             }, 300);
@@ -37,7 +37,7 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
         };
     }, [isLoading]);
 
-    // 使用防抖处理设备列表更新
+    // 使用防抖處理裝置列表更新
     useEffect(() => {
         const devicesStr = JSON.stringify(devices);
         const lastDevicesStr = JSON.stringify(lastDevices);
@@ -45,7 +45,7 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
         if (devicesStr !== lastDevicesStr) {
             setLastDevices(devices);
 
-            // 只在设备列表发生实质性变化时更新选中状态
+            // 只在裝置列表發生實質性變化時更新選中狀態
             if (devices.length > 0 && !selectedDevice) {
                 handleSelect(devices[0]);
             } else if (selectedDevice) {
@@ -77,13 +77,13 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
         }
     }, [selectedDevice, onSelect]);
 
-    // 自动刷新定时器
+    // 自動重新整理定時器
     useEffect(() => {
         const timer = setInterval(onRefresh, 2000);
         return () => clearInterval(timer);
     }, [onRefresh]);
 
-    // 处理点击外部关闭下拉框
+    // 處理點擊外部關閉下拉框
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as HTMLElement;
@@ -100,7 +100,7 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
         if (selectedDevice) {
             return (
                 <div className="min-h-[2.5rem] flex flex-col justify-center">
-                    <div className="font-medium leading-snug">{selectedDevice.model || '未知设备'}</div>
+                    <div className="font-medium leading-snug">{selectedDevice.model || '未知裝置'}</div>
                     <div className="text-sm text-gray-600 leading-snug">
                         {selectedDevice.product ? `${selectedDevice.product} • ` : ''}{selectedDevice.serial}
                     </div>
@@ -111,7 +111,7 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
         return (
             <div className="min-h-[2.5rem] flex items-center">
                 <span className="text-gray-500">
-                    {showLoading ? '正在检测设备...' : '请选择设备'}
+                    {showLoading ? '正在檢測裝置...' : '請選擇裝置'}
                 </span>
             </div>
         );
@@ -119,10 +119,10 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
 
     return (
         <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-center">选择设备</h2>
+            <h2 className="text-xl font-semibold text-center">選擇裝置</h2>
 
             <div className="relative device-dropdown">
-                {/* 选择框 */}
+                {/* 選擇框 */}
                 <button
                     type="button"
                     className={`w-full p-4 bg-white/50 backdrop-blur-sm rounded-lg transition-all text-left flex justify-between items-center ${
@@ -177,13 +177,13 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
                             <input
                                 type="text"
                                 className="w-full p-2 bg-white/50 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="搜索设备..."
+                                placeholder="搜索裝置..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
 
-                        {/* 设备列表 */}
+                        {/* 裝置列表 */}
                         <div className="overflow-y-auto overscroll-contain">
                             {filteredDevices.length > 0 ? (
                                 filteredDevices.map((device) => (
@@ -195,7 +195,7 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
                                         onClick={() => handleSelect(device)}
                                     >
                                         <div className="min-h-[2.5rem] flex flex-col justify-center">
-                                            <div className="font-medium leading-snug">{device.model || '未知设备'}</div>
+                                            <div className="font-medium leading-snug">{device.model || '未知裝置'}</div>
                                             <div className="text-sm text-gray-600 leading-snug">
                                                 {device.product ? `${device.product} • ` : ''}{device.serial}
                                             </div>
@@ -207,7 +207,7 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
                                     className="p-4 text-center text-gray-500 min-h-[4rem] flex items-center justify-center">
                                     {devices.length === 0 ? (
                                         <>
-                                            {showLoading ? '正在检测设备...' : '未检测到设备'}
+                                            {showLoading ? '正在檢測裝置...' : '未檢測到裝置'}
                                             {!showLoading && (
                                                 <button
                                                     className="ml-2 text-blue-500 hover:text-blue-600"
@@ -216,12 +216,12 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
                                                         onRefresh();
                                                     }}
                                                 >
-                                                    刷新
+                                                    重新整理
                                                 </button>
                                             )}
                                         </>
                                     ) : (
-                                        '没有找到匹配的设备'
+                                        '沒有找到匹配的裝置'
                                     )}
                                 </div>
                             )}
@@ -230,18 +230,18 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
                 )}
             </div>
 
-            {/* 确认按钮 */}
+            {/* 確認按鈕 */}
             {selectedDevice && !isConfirmed && (
                 <button
                     className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-all"
                     onClick={handleConfirm}
                     disabled={showLoading}
                 >
-                    确认选择
+                    確認選擇
                 </button>
             )}
 
-            {/* 刷新按钮 */}
+            {/* 重新整理按鈕 */}
             <button
                 className="w-full mt-2 p-2 text-blue-500 hover:text-blue-600 text-sm flex items-center justify-center"
                 onClick={() => {
@@ -260,10 +260,10 @@ export const DeviceSelection: React.FC<Props> = ({devices, onSelect, onRefresh, 
                                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                         </div>
-                        正在检测设备...
+                        正在檢測裝置...
                     </>
                 ) : (
-                    '刷新设备列表'
+                    '重新整理裝置列表'
                 )}
             </button>
         </div>

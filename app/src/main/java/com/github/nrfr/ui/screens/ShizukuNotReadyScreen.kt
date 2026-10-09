@@ -18,12 +18,12 @@ fun ShizukuNotReadyScreen() {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "需要 Shizuku 权限",
+            text = "需要 Shizuku 權限",
             style = MaterialTheme.typography.headlineMedium
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "请安装并启用 Shizuku，然后重启应用",
+            text = "請安裝並啟用 Shizuku，然後重新啟動應用程式",
             style = MaterialTheme.typography.bodyLarge
         )
     }

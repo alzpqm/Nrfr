@@ -42,7 +42,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text("Nrfr · Android 17 相容版", style = MaterialTheme.typography.titleMedium)
-                    Text("透過 Shizuku、免 root 調整系統回報的 SIM 國家碼及電信商名稱，支援分別套用與還原。")
+                    Text("透過 Shizuku、免 root 調整系統回報的 SIM 國家碼、電信業者名稱與 MCC／MNC 代碼，支援分別套用與還原。")
                     Text("套用後會核對系統回報的設定。Android 16／17 使用臨時覆寫，重啟或更換 SIM 後可能需要重新套用。")
                     Text("本工具不改寫 SIM 本身的 MCC／MNC。")
                 }

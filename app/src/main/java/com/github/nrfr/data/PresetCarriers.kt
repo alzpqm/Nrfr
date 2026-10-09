@@ -1,134 +1,186 @@
 package com.github.nrfr.data
 
+/** Common code presets, including explicitly labelled compatibility codes. */
 object PresetCarriers {
-    data class CarrierPreset(
-        val name: String,
-        val displayName: String,
-        val region: String
-    )
-
+    data class CarrierPreset(val name: String, val displayName: String, val region: String, val operatorNumeric: String)
     val presets = listOf(
-        // 中国大陆运营商
-        CarrierPreset("中国移动", "China Mobile", "CN"),
-        CarrierPreset("中国联通", "China Unicom", "CN"),
-        CarrierPreset("中国电信", "China Telecom", "CN"),
-
-        // 中国香港运营商
-        CarrierPreset("中国移动香港", "CMHK", "HK"),
-        CarrierPreset("香港电讯", "HKT", "HK"),
-        CarrierPreset("3香港", "3HK", "HK"),
-        CarrierPreset("SmarTone", "SmarTone", "HK"),
-
-        // 中国澳门运营商
-        CarrierPreset("澳门电讯", "CTM", "MO"),
-        CarrierPreset("3澳门", "3 Macau", "MO"),
-
-        // 中国台湾运营商
-        CarrierPreset("中华电信", "Chunghwa Telecom", "TW"),
-        CarrierPreset("台湾大哥大", "Taiwan Mobile", "TW"),
-        CarrierPreset("远传电信", "FarEasTone", "TW"),
-
-        // 日本运营商
-        CarrierPreset("NTT docomo", "NTT docomo", "JP"),
-        CarrierPreset("au", "au by KDDI", "JP"),
-        CarrierPreset("Softbank", "Softbank", "JP"),
-        CarrierPreset("Rakuten", "Rakuten Mobile", "JP"),
-
-        // 韩国运营商
-        CarrierPreset("SK Telecom", "SK Telecom", "KR"),
-        CarrierPreset("KT", "KT Corporation", "KR"),
-        CarrierPreset("LG U+", "LG U+", "KR"),
-
-        // 美国运营商
-        CarrierPreset("AT&T", "AT&T", "US"),
-        CarrierPreset("T-Mobile", "T-Mobile USA", "US"),
-        CarrierPreset("Verizon", "Verizon", "US"),
-        CarrierPreset("Sprint", "Sprint", "US"),
-
-        // 英国运营商
-        CarrierPreset("EE", "EE", "GB"),
-        CarrierPreset("O2", "O2 UK", "GB"),
-        CarrierPreset("Three", "Three UK", "GB"),
-        CarrierPreset("Vodafone", "Vodafone UK", "GB"),
-
-        // 新加坡运营商
-        CarrierPreset("Singtel", "Singtel", "SG"),
-        CarrierPreset("StarHub", "StarHub", "SG"),
-        CarrierPreset("M1", "M1", "SG"),
-
-        // 马来西亚运营商
-        CarrierPreset("Maxis", "Maxis", "MY"),
-        CarrierPreset("Celcom", "Celcom", "MY"),
-        CarrierPreset("Digi", "Digi", "MY"),
-        CarrierPreset("U Mobile", "U Mobile", "MY"),
-
-        // 泰国运营商
-        CarrierPreset("AIS", "AIS", "TH"),
-        CarrierPreset("DTAC", "DTAC", "TH"),
-        CarrierPreset("True Move H", "True Move H", "TH"),
-
-        // 越南运营商
-        CarrierPreset("Viettel", "Viettel Mobile", "VN"),
-        CarrierPreset("Vinaphone", "Vinaphone", "VN"),
-        CarrierPreset("Mobifone", "Mobifone", "VN"),
-
-        // 印度尼西亚运营商
-        CarrierPreset("Telkomsel", "Telkomsel", "ID"),
-        CarrierPreset("Indosat", "Indosat Ooredoo", "ID"),
-        CarrierPreset("XL Axiata", "XL Axiata", "ID"),
-
-        // 菲律宾运营商
-        CarrierPreset("Globe", "Globe Telecom", "PH"),
-        CarrierPreset("Smart", "Smart Communications", "PH"),
-        CarrierPreset("DITO", "DITO Telecommunity", "PH"),
-
-        // 印度运营商
-        CarrierPreset("Jio", "Reliance Jio", "IN"),
-        CarrierPreset("Airtel", "Bharti Airtel", "IN"),
-        CarrierPreset("Vi", "Vodafone Idea", "IN"),
-
-        // 澳大利亚运营商
-        CarrierPreset("Telstra", "Telstra", "AU"),
-        CarrierPreset("Optus", "Optus", "AU"),
-        CarrierPreset("Vodafone", "Vodafone AU", "AU"),
-
-        // 加拿大运营商
-        CarrierPreset("Bell", "Bell Mobility", "CA"),
-        CarrierPreset("Rogers", "Rogers Wireless", "CA"),
-        CarrierPreset("Telus", "Telus Mobility", "CA"),
-
-        // 德国运营商
-        CarrierPreset("Telekom", "T-Mobile DE", "DE"),
-        CarrierPreset("Vodafone", "Vodafone DE", "DE"),
-        CarrierPreset("O2", "O2 DE", "DE"),
-
-        // 法国运营商
-        CarrierPreset("Orange", "Orange FR", "FR"),
-        CarrierPreset("SFR", "SFR", "FR"),
-        CarrierPreset("Free", "Free Mobile", "FR"),
-        CarrierPreset("Bouygues", "Bouygues Telecom", "FR"),
-
-        // 意大利运营商
-        CarrierPreset("TIM", "Telecom Italia", "IT"),
-        CarrierPreset("Vodafone", "Vodafone IT", "IT"),
-        CarrierPreset("Wind Tre", "Wind Tre", "IT"),
-
-        // 西班牙运营商
-        CarrierPreset("Movistar", "Movistar", "ES"),
-        CarrierPreset("Vodafone", "Vodafone ES", "ES"),
-        CarrierPreset("Orange", "Orange ES", "ES"),
-
-        // 俄罗斯运营商
-        CarrierPreset("MTS", "MTS", "RU"),
-        CarrierPreset("MegaFon", "MegaFon", "RU"),
-        CarrierPreset("Beeline", "Beeline", "RU"),
-
-        // 巴西运营商
-        CarrierPreset("Vivo", "Vivo", "BR"),
-        CarrierPreset("Claro", "Claro", "BR"),
-        CarrierPreset("TIM", "TIM Brasil", "BR"),
-
-        // 自定义选项
-        CarrierPreset("自定义", "", "")
+        CarrierPreset("中華電信", "中華電信", "TW", "46692"),
+        CarrierPreset("臺灣大哥大", "臺灣大哥大", "TW", "46697"),
+        CarrierPreset("遠傳電信", "遠傳電信", "TW", "46601"),
+        CarrierPreset("遠傳電信（原亞太）", "遠傳電信", "TW", "46605"),
+        CarrierPreset("臺灣大哥大（原臺灣之星）", "臺灣大哥大", "TW", "46689"),
+        CarrierPreset("csl", "csl", "HK", "45400"),
+        CarrierPreset("csl（相容代碼）", "csl", "HK", "45402"),
+        CarrierPreset("1O1O／csl", "csl", "HK", "45418"),
+        CarrierPreset("中國移動香港", "CMHK", "HK", "45412"),
+        CarrierPreset("3 香港", "3HK", "HK", "45403"),
+        CarrierPreset("SmarTone 數碼通", "SmarTone", "HK", "45406"),
+        CarrierPreset("香港電訊 HKT", "HKT", "HK", "45416"),
+        CarrierPreset("中國聯通香港", "CUniq", "HK", "45407"),
+        CarrierPreset("CTExcel 香港", "CTExcel", "HK", "45431"),
+        CarrierPreset("澳門電訊 CTM", "CTM", "MO", "45501"),
+        CarrierPreset("澳門電訊 CTM（相容代碼）", "CTM", "MO", "45504"),
+        CarrierPreset("3 澳門", "3 Macau", "MO", "45503"),
+        CarrierPreset("中國電信澳門", "中國電信澳門", "MO", "45502"),
+        CarrierPreset("SmarTone 澳門", "SmarTone", "MO", "45500"),
+        CarrierPreset("中國移動", "中國移動", "CN", "46000"),
+        CarrierPreset("中國移動（相容代碼）", "中國移動", "CN", "46002"),
+        CarrierPreset("中國聯通", "中國聯通", "CN", "46001"),
+        CarrierPreset("中國聯通（相容代碼）", "中國聯通", "CN", "46006"),
+        CarrierPreset("中國電信", "中國電信", "CN", "46003"),
+        CarrierPreset("中國電信（相容代碼）", "中國電信", "CN", "46011"),
+        CarrierPreset("中國廣電", "中國廣電", "CN", "46015"),
+        CarrierPreset("NTT docomo", "NTT docomo", "JP", "44010"),
+        CarrierPreset("au／KDDI", "au", "JP", "44050"),
+        CarrierPreset("SoftBank", "SoftBank", "JP", "44020"),
+        CarrierPreset("樂天行動 Rakuten", "Rakuten Mobile", "JP", "44011"),
+        CarrierPreset("Y!mobile", "Y!mobile", "JP", "44000"),
+        CarrierPreset("SK Telecom", "SK Telecom", "KR", "45005"),
+        CarrierPreset("KT", "KT", "KR", "45008"),
+        CarrierPreset("LG U+", "LG U+", "KR", "45006"),
+        CarrierPreset("Singtel", "Singtel", "SG", "52501"),
+        CarrierPreset("StarHub", "StarHub", "SG", "52505"),
+        CarrierPreset("M1", "M1", "SG", "52503"),
+        CarrierPreset("SIMBA", "SIMBA", "SG", "52510"),
+        CarrierPreset("Maxis", "Maxis", "MY", "50212"),
+        CarrierPreset("CelcomDigi（Celcom）", "CelcomDigi", "MY", "50219"),
+        CarrierPreset("CelcomDigi（Digi）", "CelcomDigi", "MY", "50216"),
+        CarrierPreset("U Mobile", "U Mobile", "MY", "50218"),
+        CarrierPreset("Unifi Mobile", "Unifi Mobile", "MY", "502153"),
+        CarrierPreset("Yes", "Yes", "MY", "502152"),
+        CarrierPreset("AIS", "AIS", "TH", "52001"),
+        CarrierPreset("AIS（AWN）", "AIS", "TH", "52003"),
+        CarrierPreset("TrueMove H", "TrueMove H", "TH", "52004"),
+        CarrierPreset("dtac", "dtac", "TH", "52005"),
+        CarrierPreset("National Telecom", "NT", "TH", "52002"),
+        CarrierPreset("Viettel", "Viettel", "VN", "45204"),
+        CarrierPreset("VinaPhone", "VinaPhone", "VN", "45202"),
+        CarrierPreset("MobiFone", "MobiFone", "VN", "45201"),
+        CarrierPreset("Vietnamobile", "Vietnamobile", "VN", "45205"),
+        CarrierPreset("Telkomsel", "Telkomsel", "ID", "51010"),
+        CarrierPreset("Indosat Ooredoo", "Indosat Ooredoo", "ID", "51001"),
+        CarrierPreset("XL Axiata", "XL Axiata", "ID", "51011"),
+        CarrierPreset("Smartfren", "Smartfren", "ID", "51009"),
+        CarrierPreset("Tri Indonesia", "Tri", "ID", "51089"),
+        CarrierPreset("Globe", "Globe", "PH", "51502"),
+        CarrierPreset("Smart", "Smart", "PH", "51503"),
+        CarrierPreset("DITO", "DITO", "PH", "51566"),
+        CarrierPreset("Jio", "Jio", "IN", "405840"),
+        CarrierPreset("Airtel", "Airtel", "IN", "40410"),
+        CarrierPreset("Vodafone Idea", "Vi", "IN", "40420"),
+        CarrierPreset("BSNL", "BSNL", "IN", "40434"),
+        CarrierPreset("AT&T", "AT&T", "US", "310410"),
+        CarrierPreset("T-Mobile", "T-Mobile", "US", "310260"),
+        CarrierPreset("Verizon", "Verizon", "US", "311480"),
+        CarrierPreset("US Cellular", "US Cellular", "US", "311580"),
+        CarrierPreset("O2", "O2 UK", "GB", "23410"),
+        CarrierPreset("O2（相容代碼）", "O2 UK", "GB", "23411"),
+        CarrierPreset("EE", "EE", "GB", "23430"),
+        CarrierPreset("EE（相容代碼）", "EE", "GB", "23433"),
+        CarrierPreset("Three", "Three UK", "GB", "23420"),
+        CarrierPreset("Vodafone", "Vodafone UK", "GB", "23415"),
+        CarrierPreset("Sky Mobile", "Sky Mobile", "GB", "23457"),
+        CarrierPreset("Lycamobile", "Lycamobile", "GB", "23426"),
+        CarrierPreset("Telstra", "Telstra", "AU", "50501"),
+        CarrierPreset("Optus", "Optus", "AU", "50502"),
+        CarrierPreset("Vodafone 澳洲", "Vodafone", "AU", "50503"),
+        CarrierPreset("Spark", "Spark", "NZ", "53005"),
+        CarrierPreset("One NZ", "One NZ", "NZ", "53001"),
+        CarrierPreset("2degrees", "2degrees", "NZ", "53024"),
+        CarrierPreset("Bell", "Bell", "CA", "302610"),
+        CarrierPreset("Rogers", "Rogers", "CA", "302720"),
+        CarrierPreset("TELUS", "TELUS", "CA", "302220"),
+        CarrierPreset("Freedom Mobile", "Freedom Mobile", "CA", "302490"),
+        CarrierPreset("Vidéotron", "Vidéotron", "CA", "302500"),
+        CarrierPreset("Deutsche Telekom", "Telekom", "DE", "26201"),
+        CarrierPreset("Vodafone 德國", "Vodafone", "DE", "26202"),
+        CarrierPreset("O2 德國", "O2", "DE", "26207"),
+        CarrierPreset("1&1", "1&1", "DE", "26223"),
+        CarrierPreset("Orange 法國", "Orange", "FR", "20801"),
+        CarrierPreset("SFR", "SFR", "FR", "20810"),
+        CarrierPreset("Free Mobile", "Free Mobile", "FR", "20815"),
+        CarrierPreset("Bouygues Telecom", "Bouygues Telecom", "FR", "20820"),
+        CarrierPreset("TIM 義大利", "TIM", "IT", "22201"),
+        CarrierPreset("Vodafone 義大利", "Vodafone", "IT", "22210"),
+        CarrierPreset("WindTre", "WindTre", "IT", "22288"),
+        CarrierPreset("Iliad 義大利", "Iliad", "IT", "22250"),
+        CarrierPreset("Movistar 西班牙", "Movistar", "ES", "21407"),
+        CarrierPreset("Vodafone 西班牙", "Vodafone", "ES", "21401"),
+        CarrierPreset("Orange 西班牙", "Orange", "ES", "21403"),
+        CarrierPreset("Yoigo", "Yoigo", "ES", "21404"),
+        CarrierPreset("MEO", "MEO", "PT", "26806"),
+        CarrierPreset("NOS", "NOS", "PT", "26803"),
+        CarrierPreset("Vodafone 葡萄牙", "Vodafone", "PT", "26801"),
+        CarrierPreset("KPN", "KPN", "NL", "20408"),
+        CarrierPreset("Vodafone 荷蘭", "Vodafone", "NL", "20404"),
+        CarrierPreset("Odido", "Odido", "NL", "20416"),
+        CarrierPreset("Swisscom", "Swisscom", "CH", "22801"),
+        CarrierPreset("Sunrise", "Sunrise", "CH", "22802"),
+        CarrierPreset("Salt", "Salt", "CH", "22803"),
+        CarrierPreset("A1 奧地利", "A1", "AT", "23201"),
+        CarrierPreset("Magenta", "Magenta", "AT", "23203"),
+        CarrierPreset("Drei", "Drei", "AT", "23210"),
+        CarrierPreset("Telia 瑞典", "Telia", "SE", "24001"),
+        CarrierPreset("Tele2", "Tele2", "SE", "24007"),
+        CarrierPreset("Telenor 瑞典", "Telenor", "SE", "24008"),
+        CarrierPreset("Tre 瑞典", "Tre", "SE", "24002"),
+        CarrierPreset("Telenor 挪威", "Telenor", "NO", "24201"),
+        CarrierPreset("Telia 挪威", "Telia", "NO", "24202"),
+        CarrierPreset("ice", "ice", "NO", "24214"),
+        CarrierPreset("Elisa", "Elisa", "FI", "24405"),
+        CarrierPreset("DNA", "DNA", "FI", "24412"),
+        CarrierPreset("Telia 芬蘭", "Telia", "FI", "24491"),
+        CarrierPreset("TDC／YouSee", "YouSee", "DK", "23801"),
+        CarrierPreset("Telenor 丹麥", "Telenor", "DK", "23802"),
+        CarrierPreset("3 丹麥", "3", "DK", "23806"),
+        CarrierPreset("Telia 丹麥", "Telia", "DK", "23820"),
+        CarrierPreset("Orange 波蘭", "Orange", "PL", "26003"),
+        CarrierPreset("Play", "Play", "PL", "26006"),
+        CarrierPreset("Plus", "Plus", "PL", "26001"),
+        CarrierPreset("T-Mobile 波蘭", "T-Mobile", "PL", "26002"),
+        CarrierPreset("Vodafone 愛爾蘭", "Vodafone", "IE", "27201"),
+        CarrierPreset("Three 愛爾蘭", "Three", "IE", "27205"),
+        CarrierPreset("eir", "eir", "IE", "27203"),
+        CarrierPreset("Proximus", "Proximus", "BE", "20601"),
+        CarrierPreset("Orange 比利時", "Orange", "BE", "20610"),
+        CarrierPreset("BASE", "BASE", "BE", "20620"),
+        CarrierPreset("MTS", "MTS", "RU", "25001"),
+        CarrierPreset("MegaFon", "MegaFon", "RU", "25002"),
+        CarrierPreset("Beeline", "Beeline", "RU", "25099"),
+        CarrierPreset("Vivo", "Vivo", "BR", "72406"),
+        CarrierPreset("Claro 巴西", "Claro", "BR", "72405"),
+        CarrierPreset("TIM 巴西", "TIM", "BR", "72402"),
+        CarrierPreset("Telcel", "Telcel", "MX", "334020"),
+        CarrierPreset("AT&T 墨西哥", "AT&T", "MX", "334050"),
+        CarrierPreset("Movistar 墨西哥", "Movistar", "MX", "334030"),
+        CarrierPreset("Claro 阿根廷", "Claro", "AR", "722310"),
+        CarrierPreset("Movistar 阿根廷", "Movistar", "AR", "722070"),
+        CarrierPreset("Personal", "Personal", "AR", "72234"),
+        CarrierPreset("Vodacom", "Vodacom", "ZA", "65501"),
+        CarrierPreset("MTN", "MTN", "ZA", "65510"),
+        CarrierPreset("Cell C", "Cell C", "ZA", "65507"),
+        CarrierPreset("Telkom 南非", "Telkom", "ZA", "65502"),
+        CarrierPreset("Turkcell", "Turkcell", "TR", "28601"),
+        CarrierPreset("Vodafone 土耳其", "Vodafone", "TR", "28602"),
+        CarrierPreset("Türk Telekom", "Türk Telekom", "TR", "28603"),
+        CarrierPreset("e&", "e&", "AE", "42402"),
+        CarrierPreset("du", "du", "AE", "42403"),
+        CarrierPreset("stc", "stc", "SA", "42001"),
+        CarrierPreset("Mobily", "Mobily", "SA", "42003"),
+        CarrierPreset("Zain 沙烏地阿拉伯", "Zain", "SA", "42004"),
+        CarrierPreset("Cellcom", "Cellcom", "IL", "42502"),
+        CarrierPreset("Partner", "Partner", "IL", "42501"),
+        CarrierPreset("Pelephone", "Pelephone", "IL", "42503"),
+        CarrierPreset("Jazz", "Jazz", "PK", "41001"),
+        CarrierPreset("Zong", "Zong", "PK", "41004"),
+        CarrierPreset("Telenor 巴基斯坦", "Telenor", "PK", "41006"),
+        CarrierPreset("Ufone", "Ufone", "PK", "41003"),
+        CarrierPreset("Grameenphone", "Grameenphone", "BD", "47001"),
+        CarrierPreset("Robi", "Robi", "BD", "47002"),
+        CarrierPreset("Banglalink", "Banglalink", "BD", "47003"),
+        CarrierPreset("Dialog", "Dialog", "LK", "41302"),
+        CarrierPreset("SLT-Mobitel", "SLT-Mobitel", "LK", "41301"),
+        CarrierPreset("Hutch", "Hutch", "LK", "41308"),
+        CarrierPreset("自訂", "", "", "")
     )
-} 
+}

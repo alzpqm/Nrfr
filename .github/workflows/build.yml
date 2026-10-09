@@ -59,7 +59,7 @@ jobs:
           # 输出
           echo -e "$CHANGELOG"
 
-          # 将 changelog 写入文件
+          # 将 changelog 写入檔案
           echo -e "$CHANGELOG" > CHANGELOG.md
         shell: bash
 
@@ -142,7 +142,7 @@ jobs:
           rm -rf platform-tools platform-tools.zip
         shell: bash
 
-      # 打包发布文件
+      # 打包发布檔案
       - name: Create Release Archive
         run: |
           cd nrfr-client/build/bin

@@ -17,9 +17,9 @@ export const AppCheck: React.FC<Props> = ({device, appsStatus, onNext}) => {
 
     return (
         <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-center">检查应用</h2>
+            <h2 className="text-xl font-semibold text-center">檢查應用程式</h2>
             <div className="text-center text-sm text-gray-600 mb-4">
-                当前设备：{device.model || '未知设备'} ({device.serial})
+                目前裝置：{device.model || '未知裝置'} ({device.serial})
             </div>
             <div className="space-y-2">
                 <div className="p-4 bg-white/50 backdrop-blur-sm rounded-lg">
@@ -27,7 +27,7 @@ export const AppCheck: React.FC<Props> = ({device, appsStatus, onNext}) => {
                         <span>Shizuku</span>
                         <div className="flex items-center">
                             <span className={appsStatus.shizuku ? 'text-green-500' : 'text-red-500'}>
-                                {appsStatus.shizuku ? '已安装' : '未安装'}
+                                {appsStatus.shizuku ? '已安裝' : '未安裝'}
                             </span>
                             {appsStatus.shizuku && (
                                 <svg className="w-5 h-5 ml-2 text-green-500" fill="none" stroke="currentColor"
@@ -44,7 +44,7 @@ export const AppCheck: React.FC<Props> = ({device, appsStatus, onNext}) => {
                         <span>Nrfr</span>
                         <div className="flex items-center">
                             <span className={appsStatus.nrfr.installed ? 'text-green-500' : 'text-red-500'}>
-                                {appsStatus.nrfr.installed ? '已安装' : '未安装'}
+                                {appsStatus.nrfr.installed ? '已安裝' : '未安裝'}
                             </span>
                             {appsStatus.nrfr.installed && (
                                 <svg className="w-5 h-5 ml-2 text-green-500" fill="none" stroke="currentColor"
@@ -62,7 +62,7 @@ export const AppCheck: React.FC<Props> = ({device, appsStatus, onNext}) => {
                 onClick={handleConfirm}
                 disabled={isConfirmed}
             >
-                {isConfirmed ? '已确认' : '确认并继续'}
+                {isConfirmed ? '已確認' : '確認並繼續'}
             </button>
         </div>
     );

@@ -4,5 +4,9 @@ data class SimCardInfo(
     val slot: Int,
     val subId: Int,
     val carrierName: String,
-    val currentConfig: Map<String, String> = emptyMap()
+    val currentConfig: Map<String, String> = emptyMap(),
+    val simOperator: String = "",
+    val networkOperator: String = "",
+    val subscriptionOperator: String = "",
+    val simCountryIso: String = ""
 ) 

@@ -15,15 +15,15 @@ export const TitleBar: React.FC = () => {
             <div className="bg-white/30 backdrop-blur-md h-8 flex items-center px-4"
                  style={{"--wails-draggable": "drag"} as React.CSSProperties}>
                 <div className="flex-1 flex items-center space-x-2">
-                    <img src={logo} className="w-4 h-4" alt="logo"/>
-                    <div className="text-sm font-semibold text-gray-700">Nrfr - 快速启动工具</div>
+                    <img src={logo} className="w-4 h-4" alt="Nrfr 圖示"/>
+                    <div className="text-sm font-semibold text-gray-700">Nrfr - 快速啟動工具</div>
                 </div>
                 <div className="flex space-x-2" style={{"--wails-draggable": "no-drag"} as React.CSSProperties}>
                     <button
                         className="text-gray-600 hover:text-gray-800 px-2"
                         onClick={() => setShowAbout(!showAbout)}
-                        title="关于"
-                        aria-label="打开关于页面"
+                        title="關於"
+                        aria-label="打開關於頁面"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20"
                              fill="currentColor">
@@ -33,11 +33,11 @@ export const TitleBar: React.FC = () => {
                         </svg>
                     </button>
                     <button className="window-control-button bg-yellow-400 hover:bg-yellow-500" title="最小化"
-                            aria-label="最小化窗口" onClick={() => WindowMinimise()}></button>
+                            aria-label="最小化視窗" onClick={() => WindowMinimise()}></button>
                     <button className="window-control-button bg-green-400 hover:bg-green-500" title="最大化"
-                            aria-label="最大化窗口" onClick={() => WindowMaximise()}></button>
-                    <button className="window-control-button bg-red-400 hover:bg-red-500" title="关闭"
-                            aria-label="关闭窗口" onClick={() => WindowClose()}></button>
+                            aria-label="最大化視窗" onClick={() => WindowMaximise()}></button>
+                    <button className="window-control-button bg-red-400 hover:bg-red-500" title="關閉"
+                            aria-label="關閉視窗" onClick={() => WindowClose()}></button>
                 </div>
             </div>
 
@@ -49,8 +49,8 @@ export const TitleBar: React.FC = () => {
                         <button
                             onClick={() => setShowAbout(false)}
                             className="absolute right-2 top-2 text-gray-400 hover:text-gray-600 transition-colors"
-                            title="关闭"
-                            aria-label="关闭关于页面"
+                            title="關閉"
+                            aria-label="關閉關於頁面"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24"
                                  stroke="currentColor">

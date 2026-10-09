@@ -11,23 +11,23 @@ interface Props {
 }
 
 export const AppInstall: React.FC<Props> = ({device, appsStatus, isLoading, onInstall, onUpdate, onNext}) => {
-    // 只有完全没安装的应用才是必需操作
+    // 只有完全沒安裝的應用程式才是必需操作
     const needsRequiredAction = !appsStatus.shizuku || !appsStatus.nrfr.installed;
-    // 有可更新的应用
+    // 有可更新的應用程式
     const hasOptionalUpdate = appsStatus.nrfr.installed && appsStatus.nrfr.needUpdate;
-    // 安装完成（不考虑更新状态）
+    // 安裝完成（不考慮更新狀態）
     const isComplete = appsStatus.shizuku && appsStatus.nrfr.installed;
 
     return (
         <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-center">安装应用</h2>
+            <h2 className="text-xl font-semibold text-center">安裝應用程式</h2>
             <div className="text-center text-sm text-gray-600 mb-4">
-                当前设备：{device.model || '未知设备'} ({device.serial})
+                目前裝置：{device.model || '未知裝置'} ({device.serial})
             </div>
             <div className="space-y-2">
                 {!appsStatus.shizuku && (
                     <div className="p-4 bg-white/50 backdrop-blur-sm rounded-lg flex justify-between items-center">
-                        <span>需要安装 Shizuku</span>
+                        <span>需要安裝 Shizuku</span>
                         {isLoading && (
                             <div className="animate-spin">
                                 <svg className="w-4 h-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -43,7 +43,7 @@ export const AppInstall: React.FC<Props> = ({device, appsStatus, isLoading, onIn
                 )}
                 {!appsStatus.nrfr.installed && (
                     <div className="p-4 bg-white/50 backdrop-blur-sm rounded-lg flex justify-between items-center">
-                        <span>需要安装 Nrfr</span>
+                        <span>需要安裝 Nrfr</span>
                         {isLoading && (
                             <div className="animate-spin">
                                 <svg className="w-4 h-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -64,7 +64,7 @@ export const AppInstall: React.FC<Props> = ({device, appsStatus, isLoading, onIn
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                       d="M5 13l4 4L19 7"/>
                             </svg>
-                            <span>所有必需应用已安装完成</span>
+                            <span>所有必需應用程式已安裝完成</span>
                         </div>
                     </div>
                 )}
@@ -77,7 +77,7 @@ export const AppInstall: React.FC<Props> = ({device, appsStatus, isLoading, onIn
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                           d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                                 </svg>
-                                <span>发现 Nrfr 新版本可用</span>
+                                <span>發現 Nrfr 新版本可用</span>
                             </div>
                         </div>
                     </div>
@@ -90,7 +90,7 @@ export const AppInstall: React.FC<Props> = ({device, appsStatus, isLoading, onIn
                         onClick={onInstall}
                         disabled={isLoading}
                     >
-                        {isLoading ? '安装中...' : '安装必需应用'}
+                        {isLoading ? '安裝中...' : '安裝必需應用程式'}
                     </button>
                 )}
                 {hasOptionalUpdate && !needsRequiredAction && (
@@ -108,7 +108,7 @@ export const AppInstall: React.FC<Props> = ({device, appsStatus, isLoading, onIn
                         onClick={onNext}
                         disabled={isLoading}
                     >
-                        继续下一步 {hasOptionalUpdate ? '(暂不更新)' : ''}
+                        繼續下一步 {hasOptionalUpdate ? '(暫不更新)' : ''}
                     </button>
                 )}
             </div>

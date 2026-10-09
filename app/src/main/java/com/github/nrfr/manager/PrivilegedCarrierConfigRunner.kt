@@ -30,12 +30,13 @@ internal object PrivilegedCarrierConfigRunner {
     const val RESULT_ERROR = "error"
     const val RESULT_PERSISTENT = "persistent"
     const val RESULT_SIM_CARDS = "sim_cards"
+    const val RESULT_REQUIRES_RESTART = "requires_restart"
     private const val TIMEOUT_MS = 15_000L
     private const val INSTR_FLAG_NO_RESTART = 8
 
     sealed interface Request {
         data object ReadSimCards : Request
-        data class Override(val subId: Int, val values: PersistableBundle?) : Request
+        data class Override(val subId: Int, val values: PersistableBundle?, val operatorNumeric: String? = null) : Request
     }
 
     private val requests = PendingRequestStore<Request>(TIMEOUT_MS, SystemClock::elapsedRealtime)
@@ -50,18 +51,18 @@ internal object PrivilegedCarrierConfigRunner {
 
     fun activityManager(): IActivityManager {
         val binder = ServiceManager.getService(Context.ACTIVITY_SERVICE)
-            ?: error("ActivityManager 服务不可用")
+            ?: error("ActivityManager 服務不可用")
         return IActivityManager.Stub.asInterface(ShizukuBinderWrapper(binder))
     }
 
     suspend fun run(context: Context, request: Request): Bundle = withContext(Dispatchers.IO) {
         mutex.withLock {
-            check(Shizuku.pingBinder()) { "Shizuku 未运行" }
+            check(Shizuku.pingBinder()) { "Shizuku 未執行" }
             check(Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-                "请重新授予 Shizuku 权限"
+                "請重新授予 Shizuku 權限"
             }
             check(activeResult?.isCompleted != false) {
-                "上一次操作仍未结束，请稍后重试或重启应用"
+                "上一次操作仍未結束，請稍後重試或重新啟動應用程式"
             }
             val token = requests.add(Process.myPid(), request)
             val component = ComponentName(context, CarrierConfigInstrumentation::class.java)
@@ -72,7 +73,7 @@ internal object PrivilegedCarrierConfigRunner {
                 override fun instrumentationFinished(name: ComponentName?, code: Int, results: Bundle?) {
                     if (name == component) {
                         if (code == Activity.RESULT_OK && results != null) result.complete(results)
-                        else result.completeExceptionally(IllegalStateException("配置服务未正常结束"))
+                        else result.completeExceptionally(IllegalStateException("設定服務未正常結束"))
                     }
                 }
             }
@@ -87,11 +88,11 @@ internal object PrivilegedCarrierConfigRunner {
                     component, null, INSTR_FLAG_NO_RESTART, arguments, watcher,
                     UiAutomationConnection(), Process.myUid() / 100_000, null,
                 )
-                check(started) { "系统拒绝启动配置服务" }
+                check(started) { "系統拒絕啟動設定服務" }
                 val reply = withTimeoutOrNull(TIMEOUT_MS) { result.await() }
-                    ?: error("配置操作超时，尚未确认生效")
+                    ?: error("設定操作逾時，尚未確認生效")
                 check(reply.getBoolean(RESULT_SUCCESS, false)) {
-                    reply.getString(RESULT_ERROR) ?: "配置操作失败"
+                    reply.getString(RESULT_ERROR) ?: "設定操作失敗"
                 }
                 reply
             } catch (error: CancellationException) {
