@@ -211,7 +211,7 @@ fun MainScreen(onShowAbout: () -> Unit) {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     enabled = canEdit, modifier = Modifier.fillMaxWidth(),
                 )
-                Text("只修改 SIM 讀取代碼。連線網路／基地台 MCC／MNC 未修改；DevCheck 等 App 若使用網路資料，仍會顯示實際代碼。",
+                Text("只修改 SIM 讀取代碼。連線網路／基地台 MCC／MNC 未修改；其他 App 若使用網路資料，仍會顯示實際代碼。",
                     style = MaterialTheme.typography.bodySmall)
             }
             Spacer(modifier = Modifier.height(8.dp))

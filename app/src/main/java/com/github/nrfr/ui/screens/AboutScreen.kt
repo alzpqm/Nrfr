@@ -44,7 +44,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     Text("Nrfr · Android 17 相容版", style = MaterialTheme.typography.titleMedium)
                     Text("透過 Shizuku、免 root 調整系統回報的 SIM 國家碼、電信業者名稱與 MCC／MNC 代碼，支援分別套用與還原。")
                     Text("套用後會核對系統回報的設定。Android 16／17 使用臨時覆寫，重啟或更換 SIM 後可能需要重新套用。")
-                    Text("代碼修改只針對系統的 SIM 讀取值；不改寫實體 SIM、訂閱資料或連線網路／基地台 MCC／MNC。DevCheck 的網路代碼可能仍顯示實際值。")
+                    Text("代碼修改只針對系統的 SIM 讀取值；不改寫實體 SIM、訂閱資料或連線網路／基地台 MCC／MNC。其他 App 使用不同來源時，仍可能顯示原碼。")
                 }
             }
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -52,7 +52,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text("此版本由 alzpqm 維護", style = MaterialTheme.typography.titleMedium)
+                    Text("Nrfr 維護團隊", style = MaterialTheme.typography.titleMedium)
                     AboutLink("專案首頁", "https://github.com/alzpqm/Nrfr")
                     AboutLink("下載版本", "https://github.com/alzpqm/Nrfr/releases")
                     AboutLink("回報問題", "https://github.com/alzpqm/Nrfr/issues")

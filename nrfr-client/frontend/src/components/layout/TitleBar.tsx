@@ -61,7 +61,7 @@ export const TitleBar: React.FC = () => {
 
                         <div className="bg-blue-50/50 rounded-lg p-3 space-y-2">
                             <p className="text-gray-700 font-medium">Nrfr · Android 17 相容版</p>
-                            <p className="text-sm text-gray-600">此 fork 由 alzpqm 維護，透過 Shizuku 免 root 調整 SIM 設定。</p>
+                            <p className="text-sm text-gray-600">由 Nrfr 維護團隊維護，透過 Shizuku 免 root 調整 SIM 設定。</p>
                             <button
                                 onClick={handleOpenProject}
                                 className="flex items-center space-x-1.5 text-blue-500 hover:text-blue-600 transition-colors"
