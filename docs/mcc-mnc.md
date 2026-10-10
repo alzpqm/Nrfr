@@ -4,13 +4,13 @@ SIM 電信業者代碼由 3 位 MCC 與 2／3 位 MNC 組成，以字串處理�
 
 ## 目前功能範圍
 
-**1.1.4 候選版暫停新的 MCC／MNC 套用**。Android 使用 SIM 代碼及業者條件篩選 APN；覆寫代碼可能讓原 APN 消失、新建項目無法保存或選取。1.1.3 的相容項目方案已撤回，目前未確認可靠的免 root 替代方法。
+**1.1.4 恢復 1.1.2 的 MCC／MNC 提交方式**，先備份原值，再直接提交 SIM 測試覆寫，不建立或修改相容 APN。Android 使用 SIM 代碼及業者條件篩選 APN；覆寫代碼仍可能讓原 APN 消失、新建項目無法保存或選取，並影響行動數據。
 
-可繼續調整國家碼及名稱、查閱業者預設代碼，或還原舊版修改。選擇預設業者不會套用 MCC／MNC。
+選擇業者會填入預設代碼，勾選「修改 SIM 電信業者代碼」後才會提交；未勾選時只調整國家碼及名稱。套用成功表示所選設定已回讀確認，不代表 APN 與行動數據正常。如有異常，請還原設定並按提示重啟。
 
 | 資料來源 | 目前處理 |
 | --- | --- |
-| SIM 代碼 `TelephonyManager.getSimOperator()` | 顯示；還原時核對原值 |
+| SIM 代碼 `TelephonyManager.getSimOperator()` | 顯示、覆寫及回讀；還原時核對原值 |
 | 訂閱資料 `SubscriptionInfo.mccString/mncString` | 顯示；本機備份缺失時作為還原候選來源 |
 | 連線網路 `TelephonyManager.getNetworkOperator()` | 僅顯示 |
 | 基地台、IMSI、ICCID、實體 SIM 內容 | 不修改 |

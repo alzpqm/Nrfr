@@ -193,16 +193,17 @@ fun MainScreen(onShowAbout: () -> Unit) {
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = false, onCheckedChange = null, enabled = false)
-                Text("修改 SIM 電信業者代碼（暫停）")
+                Checkbox(checked = editor.changeNumeric, onCheckedChange = { editor = editor.copy(changeNumeric = it) },
+                    enabled = canEdit && Build.VERSION.SDK_INT >= 29)
+                Text("修改 SIM 電信業者代碼")
             }
-            Text("代碼覆寫可能造成 APN 消失，暫停新的 MCC／MNC 套用。可調整國家碼與名稱；若曾改碼，請使用「還原設定」。",
-                style = MaterialTheme.typography.bodySmall)
-            if (editor.operatorNumeric.isNotEmpty()) {
+            if (Build.VERSION.SDK_INT < 29) Text("電信業者代碼覆寫需要 Android 10 以上。")
+            if (editor.changeNumeric) {
                 val valid = OperatorNumeric.isValid(editor.operatorNumeric.trim())
                 OutlinedTextField(
-                    value = editor.operatorNumeric, onValueChange = {}, readOnly = true,
-                    label = { Text("業者預設代碼（僅供查閱）") },
+                    value = editor.operatorNumeric, onValueChange = { editor = editor.copy(operatorNumeric = it) },
+                    label = { Text("電信業者代碼（MCC＋MNC）") },
+                    placeholder = { Text("45402、23410、310260") },
                     supportingText = { Text(if (valid) OperatorNumeric.parse(editor.operatorNumeric).let {
                         "MCC：${it.mcc}　MNC：${it.mnc}"
                     } else "請輸入 5 或 6 位半形數字，前導零會保留。") },
@@ -210,6 +211,10 @@ fun MainScreen(onShowAbout: () -> Unit) {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     enabled = canEdit, modifier = Modifier.fillMaxWidth(),
                 )
+                Text("修改代碼可能使 APN 清單消失、新建項目無法保存或選取，並影響行動數據。如有異常，請還原設定並依提示重新啟動手機。",
+                    style = MaterialTheme.typography.bodySmall)
+                Text("只修改 SIM 讀取代碼。連線網路／基地台 MCC／MNC 未修改；其他 App 若使用網路資料，仍會顯示實際代碼。",
+                    style = MaterialTheme.typography.bodySmall)
             }
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -222,7 +227,7 @@ fun MainScreen(onShowAbout: () -> Unit) {
                 selectedCarrier = editor.selectedCarrier,
                 customCarrierName = editor.customCarrierName,
                 enabled = canEdit,
-                changeNumeric = false,
+                changeNumeric = editor.changeNumeric,
                 operatorNumeric = editor.operatorNumeric,
                 onReset = { simCard ->
                     editor = editor.copy(operationMessage = null)
@@ -256,18 +261,24 @@ fun MainScreen(onShowAbout: () -> Unit) {
                         editor.selectedCarrier?.displayName
                     }
                     val countryCode = if (editor.isCustomCountryCode) editor.customCountryCode else editor.selectedCountryCode
+                    val chosenNumeric = if (editor.changeNumeric) editor.operatorNumeric.trim() else null
                     editor = editor.copy(operationMessage = null)
                     isApplying = true
                     scope.launch {
                         try {
                             val result = CarrierConfigManager.setCarrierConfig(
-                                context, simCard.subId, countryCode, carrierName,
+                                context, simCard.subId, countryCode, carrierName, chosenNumeric,
                             )
                             val verified = Build.VERSION.SDK_INT >= 29
                             val message = buildString {
                                 append("SIM ${simCard.slot}：${if (verified) "以下讀取值已回讀確認" else "以下設定已提交"}。")
                                 if (countryCode.isNotEmpty()) append("\nSIM 國家碼：${countryCode.lowercase(Locale.ROOT)}")
                                 carrierName?.let { append("\n電信業者名稱：$it") }
+                                chosenNumeric?.let {
+                                    append("\nSIM 電信業者代碼：$it")
+                                    append("\n連線網路／基地台 MCC／MNC 未修改。")
+                                    append("\n此回讀結果不代表 APN 或行動數據正常；若有異常，請還原設定。")
+                                }
                                 append(if (result.persistent) "\n設定已儲存。" else "\n重新啟動、更換 SIM 或系統重載後可能需要重新套用。")
                             }
                             editor = editor.copy(operationMessage = message)

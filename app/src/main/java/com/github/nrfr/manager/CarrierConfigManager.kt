@@ -45,7 +45,6 @@ object CarrierConfigManager {
     // Returns whether the system accepted a persistent override.
     suspend fun setCarrierConfig(context: Context, subId: Int, countryCode: String?, carrierName: String? = null,
         operatorNumeric: String? = null): OperationResult {
-        NumericOverridePolicy.requireAllowed(operatorNumeric)
         val bundle = PersistableBundle()
         if (!countryCode.isNullOrEmpty()) {
             require(countryCode.matches(Regex("[a-zA-Z]{2}"))) { "國家碼須為兩位英文字母" }

@@ -165,18 +165,11 @@ class CarrierRestoreCoordinatorTest {
         assertTrue(device.backup)
     }
 
-    @Test fun newNumericOverridesAreRejectedBeforeAnyOperation() {
-        NumericOverridePolicy.requireAllowed(null)
-        for (code in listOf("99901", "999002", "")) {
-            assertThrows(IllegalArgumentException::class.java) { NumericOverridePolicy.requireAllowed(code) }
-        }
-    }
-
     @Test fun backupAndSubscriptionFallbackPreserveLeadingZeroes() {
-        assertEquals("999002", NumericOverridePolicy.original("999002", "99801"))
-        assertEquals("99801", NumericOverridePolicy.original(null, "99801"))
-        assertEquals("998001", NumericOverridePolicy.original("invalid", "998001"))
-        assertEquals("999002", NumericOverridePolicy.original(" 999002 ", "99801"))
-        assertNull(NumericOverridePolicy.original(null, ""))
+        assertEquals("999002", OriginalCarrierIdentity.original("999002", "99801"))
+        assertEquals("99801", OriginalCarrierIdentity.original(null, "99801"))
+        assertEquals("998001", OriginalCarrierIdentity.original("invalid", "998001"))
+        assertEquals("999002", OriginalCarrierIdentity.original(" 999002 ", "99801"))
+        assertNull(OriginalCarrierIdentity.original(null, ""))
     }
 }

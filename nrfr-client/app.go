@@ -452,7 +452,7 @@ func (a *App) CheckNrfrUpdate() (bool, error) {
 	}
 
 	// 目前最新正式版；已撤回版本及候選版不自動推薦。
-	latestVersion := "1.1.2" // 目前正式版；候選版不自動推薦
+	latestVersion := "1.1.4" // 目前正式版；候選版不自動推薦
 
 	// 比較版本號
 	return compareVersions(currentVersion, latestVersion) < 0, nil

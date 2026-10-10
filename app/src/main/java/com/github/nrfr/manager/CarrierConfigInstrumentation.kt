@@ -13,6 +13,7 @@ import android.os.SystemClock
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.util.Log
+import com.github.nrfr.model.OperatorNumeric
 import rikka.shizuku.Shizuku
 
 @TargetApi(29)
@@ -34,7 +35,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
             val request = PrivilegedCarrierConfigRunner.takeRequest(arguments)
                 ?: error("設定請求已過期或不屬於目前進程")
             if (request is PrivilegedCarrierConfigRunner.Request.Override) {
-                NumericOverridePolicy.requireAllowed(request.operatorNumeric)
+                request.operatorNumeric?.let { OperatorNumeric.parse(it) }
             }
             val deadline = SystemClock.elapsedRealtime() + 3_000L
             while (!Shizuku.pingBinder() && SystemClock.elapsedRealtime() < deadline) Thread.sleep(100)
@@ -99,10 +100,18 @@ class CarrierConfigInstrumentation : Instrumentation() {
                         result.putString(PrivilegedCarrierConfigRunner.RESULT_RESTORED_NUMERIC, report.restoredNumeric)
                         result.putString(PrivilegedCarrierConfigRunner.RESULT_WARNING, report.warning)
                     } else {
-                        val persistent = CarrierOverridePolicy.apply(Build.VERSION.SDK_INT, false) {
-                            CarrierConfigAccess.override(request.subId, request.values, it, asShell = false)
-                        }
-                        verifyConfig(request.subId, request.values)
+                        val persistent = CarrierApplyCoordinator(
+                            applyIdentity = {
+                                CarrierIdentityAccess.apply(targetContext, info, it,
+                                    request.values.getString(CarrierConfigAccess.CARRIER_NAME))
+                            },
+                            applyConfig = {
+                                CarrierOverridePolicy.apply(Build.VERSION.SDK_INT, false) {
+                                    CarrierConfigAccess.override(request.subId, request.values, it, asShell = false)
+                                }
+                            },
+                            verify = { verifyConfig(request.subId, request.values, it) },
+                        ).apply(request.operatorNumeric, !request.values.isEmpty)
                         result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_PERSISTENT, persistent)
                     }
                 }
@@ -126,7 +135,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
         }
     }
 
-    private fun verifyConfig(subId: Int, expected: PersistableBundle) {
+    private fun verifyConfig(subId: Int, expected: PersistableBundle, operatorNumeric: String?) {
         val country = expected.getString(CarrierConfigAccess.COUNTRY_ISO)?.takeIf { it.isNotEmpty() }
         val telephony = targetContext.getSystemService(TelephonyManager::class.java)
             ?.createForSubscriptionId(subId)
@@ -136,7 +145,8 @@ class CarrierConfigInstrumentation : Instrumentation() {
             @Suppress("DEPRECATION")
             val configMatches = expected.keySet().all { expected[it] == actual[it] }
             // Confirm the value apps see as well as the CarrierConfig bundle.
-            if (configMatches && (country == null || telephony?.simCountryIso == country)) return
+            if (configMatches && (country == null || telephony?.simCountryIso == country) &&
+                (operatorNumeric == null || telephony?.simOperator == operatorNumeric)) return
             Thread.sleep(100)
         } while (SystemClock.elapsedRealtime() < deadline)
         error("設定已提交，但系統回讀不一致，尚未確認生效；請重新讀取目前設定、核對 SIM 代碼或還原")

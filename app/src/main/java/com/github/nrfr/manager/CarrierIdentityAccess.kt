@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
+import com.github.nrfr.model.OperatorNumeric
 import java.lang.reflect.InvocationTargetException
 import java.security.MessageDigest
 import org.json.JSONObject
@@ -30,6 +31,34 @@ internal object CarrierIdentityAccess {
             .joinToString("") { "%02x".format(it) }
     }
 
+    // Keep the 1.1.2 submission path: back up once, then call the phone service directly.
+    // Applying an identity never reads or writes the APN database.
+    fun apply(context: Context, info: SubscriptionInfo, numeric: String, displayName: String?) {
+        val code = OperatorNumeric.parse(numeric).value
+        assertPresent(context, info)
+        val telephony = (context.getSystemService(TelephonyManager::class.java) ?: error("電話服務無法使用"))
+            .createForSubscriptionId(info.subscriptionId)
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val simKey = key(info) ?: error("無法辨識這張 SIM，尚未執行代碼覆寫；請確認 SIM 已就緒")
+        if (!prefs.contains(simKey)) {
+            val original = telephony.simOperator.orEmpty()
+            check(OperatorNumeric.isValid(original)) { "無法讀取原本的電信業者代碼，尚未執行覆寫；請確認 SIM 已就緒" }
+            val backup = JSONObject().put("numeric", original).put("name", telephony.simOperatorName.orEmpty())
+            check(prefs.edit().putString(simKey, backup.toString()).commit()) { "無法備份原本的電信設定，尚未執行覆寫" }
+        }
+        assertPresent(context, info)
+        set(service(), info.subscriptionId, code, displayName ?: telephony.simOperatorName)
+    }
+
+    private fun set(phone: Any, subId: Int, numeric: String, spn: String?) {
+        val method = phone.javaClass.methods.filter {
+            it.name == "setCarrierTestOverride" && it.parameterTypes.size in listOf(8, 10) &&
+                it.parameterTypes.first() == Int::class.javaPrimitiveType &&
+                it.parameterTypes.drop(1).all { type -> type == String::class.java }
+        }.maxByOrNull { it.parameterTypes.size } ?: error("此系統未提供相容的電信業者代碼覆寫介面")
+        invoke { method.invoke(phone, *CarrierIdentityArguments.build(method.parameterTypes.size, subId, numeric, spn)) }
+    }
+
     fun restore(context: Context, info: SubscriptionInfo): IdentityRestoreResult {
         val simKey = key(info)
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -37,7 +66,7 @@ internal object CarrierIdentityAccess {
         // A missing/corrupt backup must not block country/name clearing. Subscription data can
         // supply the original code after a reinstall; the currently overridden SIM value cannot.
         val backup = saved?.let { runCatching { JSONObject(it) }.getOrNull() }
-        val numeric = NumericOverridePolicy.original(backup?.optString("numeric"),
+        val numeric = OriginalCarrierIdentity.original(backup?.optString("numeric"),
             info.mccString.orEmpty() + info.mncString.orEmpty())
             ?: return IdentityRestoreResult(null, requiresRestart = true)
         val telephony = context.getSystemService(TelephonyManager::class.java)
@@ -53,14 +82,9 @@ internal object CarrierIdentityAccess {
             invoke { clear.invoke(phone, info.subscriptionId) }
             return IdentityRestoreResult(numeric)
         }
-        val set = phone.javaClass.methods.filter {
-            it.name == "setCarrierTestOverride" && it.parameterTypes.size in listOf(8, 10) &&
-                it.parameterTypes.first() == Int::class.javaPrimitiveType &&
-                it.parameterTypes.drop(1).all { type -> type == String::class.java }
-        }.maxByOrNull { it.parameterTypes.size } ?: error("此系統未提供相容的代碼還原介面，請重新啟動手機")
         // Restore the saved SPN too: passing null also clears the operator-name property on AOSP.
         val name = backup?.optString("name") ?: info.carrierName?.toString().orEmpty()
-        invoke { set.invoke(phone, *CarrierIdentityArguments.build(set.parameterTypes.size, info.subscriptionId, numeric, name)) }
+        set(phone, info.subscriptionId, numeric, name)
         return IdentityRestoreResult(numeric, requiresRestart = true)
     }
 
@@ -101,7 +125,7 @@ internal object CarrierIdentityAccess {
     private fun assertPresent(context: Context, info: SubscriptionInfo) {
         val active = context.getSystemService(SubscriptionManager::class.java).activeSubscriptionInfoList.orEmpty()
             .firstOrNull { it.subscriptionId == info.subscriptionId && it.simSlotIndex == info.simSlotIndex }
-        check(active != null && active.iccId == info.iccId) { "SIM 已移除或更換，已停止代碼還原" }
+        check(active != null && active.iccId == info.iccId) { "SIM 已移除或更換，已停止代碼操作" }
     }
 
     private inline fun <T> invoke(block: () -> T): T = try { block() } catch (error: InvocationTargetException) {

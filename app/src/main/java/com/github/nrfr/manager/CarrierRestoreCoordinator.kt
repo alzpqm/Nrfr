@@ -4,13 +4,7 @@ import com.github.nrfr.model.OperatorNumeric
 
 internal data class IdentityRestoreResult(val expectedNumeric: String?, val requiresRestart: Boolean = false)
 
-internal object NumericOverridePolicy {
-    fun requireAllowed(numeric: String?) {
-        require(numeric == null) {
-            "MCC／MNC 修改暫停：尚未確認可保留 APN。請只套用國家碼或名稱，或執行「還原設定」"
-        }
-    }
-
+internal object OriginalCarrierIdentity {
     fun original(backup: String?, subscription: String?): String? =
         listOfNotNull(backup, subscription).firstNotNullOfOrNull {
             runCatching { OperatorNumeric.parse(it).value }.getOrNull()
