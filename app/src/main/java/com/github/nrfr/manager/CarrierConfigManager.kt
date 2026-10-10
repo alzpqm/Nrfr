@@ -12,7 +12,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object CarrierConfigManager {
-    data class OperationResult(val persistent: Boolean, val requiresRestart: Boolean = false, val apnChecked: Boolean = false)
+    data class OperationResult(val persistent: Boolean, val requiresRestart: Boolean = false,
+        val warning: String? = null, val restoredNumeric: String? = null)
     suspend fun getSimCards(context: Context): List<SimCardInfo> {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return withContext(Dispatchers.IO) {
             CarrierConfigAccess.readSubscriptionsAsShell()
@@ -44,6 +45,7 @@ object CarrierConfigManager {
     // Returns whether the system accepted a persistent override.
     suspend fun setCarrierConfig(context: Context, subId: Int, countryCode: String?, carrierName: String? = null,
         operatorNumeric: String? = null): OperationResult {
+        NumericOverridePolicy.requireAllowed(operatorNumeric)
         val bundle = PersistableBundle()
         if (!countryCode.isNullOrEmpty()) {
             require(countryCode.matches(Regex("[a-zA-Z]{2}"))) { "國家碼須為兩位英文字母" }
@@ -74,6 +76,7 @@ object CarrierConfigManager {
             PrivilegedCarrierConfigRunner.Request.Override(subId, bundle?.let { PersistableBundle(it) }, operatorNumeric))
         return OperationResult(result.getBoolean(PrivilegedCarrierConfigRunner.RESULT_PERSISTENT),
             result.getBoolean(PrivilegedCarrierConfigRunner.RESULT_REQUIRES_RESTART),
-            result.getBoolean(PrivilegedCarrierConfigRunner.RESULT_APN_CHECKED))
+            result.getString(PrivilegedCarrierConfigRunner.RESULT_WARNING),
+            result.getString(PrivilegedCarrierConfigRunner.RESULT_RESTORED_NUMERIC))
     }
 }

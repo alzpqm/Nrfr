@@ -451,8 +451,8 @@ func (a *App) CheckNrfrUpdate() (bool, error) {
 		return false, err
 	}
 
-	// 最新版本號（從build.gradle.kts中取得）
-	latestVersion := "1.1.3" // 目前最新版本
+	// 目前最新正式版；已撤回版本及候選版不自動推薦。
+	latestVersion := "1.1.2" // 目前正式版；候選版不自動推薦
 
 	// 比較版本號
 	return compareVersions(currentVersion, latestVersion) < 0, nil

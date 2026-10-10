@@ -1,103 +1,58 @@
 # Nrfr — Android 17 相容版
 
-透過 **Shizuku、免 root** 調整系統回報的 SIM 國家碼、電信業者名稱與 MCC／MNC 代碼，支援各 SIM 分別套用及還原。
+透過 **Shizuku、免 root** 調整系統回報的 SIM 國家碼與電信業者名稱，支援各 SIM 分別套用及還原，提供正體中文介面。
 
-由 **Nrfr 維護團隊** 維護，基於 [Ackites/Nrfr](https://github.com/Ackites/Nrfr)，提供正體中文介面與較新 Android 系統的相容支援。
+由 **Nrfr 維護團隊** 維護，基於 [Ackites/Nrfr](https://github.com/Ackites/Nrfr)。
 
-[下載 APK](https://github.com/alzpqm/Nrfr/releases) · [回報問題](https://github.com/alzpqm/Nrfr/issues) · [原始碼](https://github.com/alzpqm/Nrfr)
+[下載正式版](https://github.com/alzpqm/Nrfr/releases/latest) · [回報問題](https://github.com/alzpqm/Nrfr/issues) · [原始碼](https://github.com/alzpqm/Nrfr)
 
-## 1.1.3 正式版
+## 版本狀態
 
-- 修正修改 MCC／MNC 後，原 SIM 的 APN 清單變空、無法選取的問題。
-- 保留原 APN 及預設選取，建立只匹配所選 SIM 的 APN 相容項目；套用失敗時回復原代碼與 APN。
-- 套用及還原會核對 APN 清單與選取值。沿用固定發布簽章，可直接更新 1.1.1／1.1.2 正式版。
+**1.1.3 已撤回**：APN 相容處理可能造成清單消失，APN 存取失敗也可能阻擋代碼還原。請勿繼續使用此版修改 MCC／MNC。目前正式版為 [1.1.2](https://github.com/alzpqm/Nrfr/releases/tag/v1.1.2)，其代碼覆寫仍可能影響 APN，建議只調整國家碼與名稱。
 
-[下載正式版](https://github.com/alzpqm/Nrfr/releases/latest) · [更新說明](docs/releases/1.1.3.md)
+[1.1.4-rc1 還原候選版](https://github.com/alzpqm/Nrfr/releases/tag/v1.1.4-rc1)將代碼還原與 APN 清理分開，並暫停新的 MCC／MNC 套用。候選版需要裝置驗證，尚未宣告 APN 問題已全面解決。詳見[更新說明](docs/releases/1.1.4-rc1.md)。
 
-## 主要功能
+## 功能
 
-- 修正雙卡切換時沿用上一張 SIM 的國家碼、業者與 MCC／MNC 輸入；切換卡片會清空待套用草稿。
-- 分別標示「目前讀取值」與「待套用設定」，操作結果列出所選 SIM 及已確認的欄位。
-- 同一張卡重新讀取會保留待套用內容；還原後會清空草稿及自訂模式。
-- SIM 代碼回讀成功會明示「連線網路／基地台 MCC／MNC 未修改」，避免誤認所有 App 都會變更。
-- 自訂 5／6 位電信業者代碼，保留 MNC 前導零。
-- 套用前備份所選 SIM 當時的代碼與名稱，還原時核對回讀值。
-- 修改代碼時保留原 SIM 的 APN 參數與選取值，還原時清理未被外部修改的相容項目。
-- 提供 **177 組代碼、45 個國家／地區**預設，可搜尋名稱、地區及代碼。
-- Android App 與桌面快速啟動工具完整改用正體中文。
-- 顯示 SIM 讀取值、訂閱資料及連線網路代碼，方便確認目標 App 讀取的來源。
+- 所選 SIM 的國家碼及電信業者名稱調整與回讀。
+- 雙卡草稿隔離；切換 SIM 會清空前一張卡的待套用內容。
+- 分別顯示 SIM、訂閱資料與連線網路的電信業者代碼。
+- 177 組業者預設、45 個國家／地區，可搜尋名稱、地區及代碼。
+- 原代碼還原使用同一張 SIM 的本機備份；備份遺失時，嘗試使用有效的訂閱資料代碼並核對回讀。
+- 舊 APN 相容項目只依本機回復紀錄清理，保留被外部修改的項目。
+- Android App 與桌面快速啟動工具使用正體中文。
 
-- 正式 APK 使用固定發布簽章及 R8 release 建置。
+**新的 MCC／MNC 修改目前暫停**；業者預設中的代碼僅供查閱，選擇業者不會套用該代碼。連線網路、基地台及實體 SIM 內容不會被修改，也不保證其他 App 的地區或帳號行為改變。
 
-最低安裝版本為 Android 8（API 26）；SIM 代碼覆寫需要 Android 10 以上。Android 16／17 使用臨時覆寫，重啟、換卡或系統重載後可能需要重新套用。功能可用性會因裝置與系統版本而異。
+## 使用
 
-## 開始使用
+1. 安裝 APK，啟動 Shizuku 並授權 Nrfr。
+2. 選擇 SIM，讀取目前設定。
+3. 選擇國家碼及業者名稱，點選「套用設定」，核對操作結果。
+4. 如需清除覆寫，選擇同一張 SIM，點選「還原設定」，依提示重新啟動手機並核對原代碼、APN 選取及行動數據。
 
-1. 從[此 fork 的 Releases](https://github.com/alzpqm/Nrfr/releases) 下載 APK。
-2. 安裝並啟動 [Shizuku](https://shizuku.rikka.app/)，開啟 Nrfr 後授權。
-3. 選擇需要調整的 SIM，設定兩位英文字母國家碼，例如 `US` 或 `JP`；可同時設定電信業者名稱。也可選擇預設電信業者自動填入欄位。切換 SIM 會清空草稿，請為新選擇的卡重新輸入。
-4. 若要修改代碼，勾選「修改 SIM 電信業者代碼」，輸入 5／6 位 MCC＋MNC。App 會先讀取原 SIM 的 APN，再建立相容項目；系統會重載電信設定，過程中可能短暫重新連線。
-5. 點選「套用設定」，等待系統回讀完成，再確認「目前讀取值」與「上次操作結果」。待套用輸入不代表目前已生效的值。
-6. 如需還原，選擇同一張 SIM，點選「還原設定」。
+1.1.4-rc1 沿用 1.1.1 起的固定發布簽章，可覆蓋安裝 1.1.2／1.1.3，保留本機備份；請勿為升級先解除安裝。1.0.4／1.1.0 測試 APK 的簽章不同，移除前須先還原並依提示重啟。
 
-若舊版修改代碼後 APN 清單已變空，更新到 1.1.3 後重新套用代碼即可執行 APN 保留流程；也可選擇「還原設定」回復原碼與 APN。完成後請在系統設定核對 APN，並確認行動數據能連線。
+還原會先處理原 SIM 代碼與國家碼／名稱覆寫，再嘗試清理舊相容 APN。APN 權限、清單或選取異常會另列提示；原代碼只有在回讀一致時才標示已確認。沒有本機回復紀錄的項目不會自動刪除。
 
-相容 APN 的名稱會加上「（Nrfr）」，原 APN 不會被改寫。APN 存取權限或 SIM 綁定不受系統支援時，App 會拒絕套用代碼；未確認 APN 回讀時不會回報成功。若相容項目已被手動或其他工具修改，還原會保留該項目並提示核對，避免刪除外部修改。
+## 相容性與資料
 
-從 1.0.4／1.1.0 測試 APK 升級到正式版時，請先在舊 App 還原設定，依提示重啟手機，再移除測試版並安裝正式 APK。兩者簽章不同，不能直接覆蓋安裝；後續正式版沿用固定簽章。移除 App 不會自動還原系統的 CarrierConfig 覆寫，也會刪除本機代碼備份。
+Android 8 以上；代碼還原需要 Android 10 以上。Android 16／17 使用臨時覆寫，重啟或電信服務重載後可能需要重新套用國家碼及名稱。不同系統與廠商的限制可能不同。
 
-代碼覆寫的目標是 **Android SIM 讀取介面**（`TelephonyManager.getSimOperator()`），不會改寫實體 SIM 內容或基地台註冊網路。其他 App 若讀取訂閱資料、連線網路、IMSI、快取或伺服器資料，可能仍顯示原值；套用成功不代表任何特定 App 都會接受該地區設定。
+還原可能清除其他工具對同一張 SIM 的 CarrierConfig 覆寫，使用 IMS 工具前請核對其設定。解除安裝不會自動還原系統設定，且會刪除本機備份及 APN 回復紀錄。
 
-目前連線網路與基地台的 MCC／MNC 不在本功能的修改範圍內。詳見[讀取來源與限制](docs/mcc-mnc.md)。
+備份以 SIM 識別碼的雜湊綁定，保存在裝置上，不參與雲端備份或裝置移轉。App 不上傳 SIM 或 APN 資料；舊相容 APN 的匹配資訊可能仍保存在系統資料庫。回報問題時僅需提供型號、系統版本與錯誤文字，請勿公開 SIM 識別碼、電話號碼、APN 帳號或密碼。
 
-首次修改代碼時，備份的是此 App 當時讀到的值；若先前已由其他工具覆寫，還原會回到該值。系統未提供完整清除介面時，App 會先回復代碼，再提示重啟手機結束測試覆寫狀態。解除安裝會失去本機備份，請先還原或重啟手機。
+[代碼與還原說明](docs/mcc-mnc.md) · [Android 17 相容方式](docs/android-17-compatibility.md) · [發布簽章](docs/release-signing.md)
 
-預設清單包含相容代碼及已合併業者的舊代碼，不代表所有條目目前都在營運。詳見[代碼覆寫與預設清單](docs/mcc-mnc.md)。
+## 建置與授權
 
-「還原設定」會清除所選 SIM 的 CarrierConfig 覆寫，也可能清除其他工具對同一張 SIM 設定的覆寫。若系統只允許清除臨時設定，App 會提示你核對重啟後的結果。
-
-## 建置
-
-| 項目 | 版本 |
-| --- | --- |
-| Compile SDK | Android 17，API 37.2 |
-| Target SDK | API 37 |
-| Minimum SDK | API 26 |
-| SDK Build Tools | 37.0.0 |
-| Android Gradle Plugin | 9.4.1 |
-| Gradle Wrapper | 9.6.0 |
-| Kotlin／Compose 編譯插件 | 2.2.10（AGP 內建 Kotlin） |
-| JDK | 17 或以上 |
-
-在專案根目錄執行：
+使用 JDK 17、Android SDK Platform 37.2、Build Tools 37.0.0 及 Gradle 9.6.0：
 
 ```sh
 ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease
 ```
 
-可安裝的 debug APK 位於 `app/build/outputs/apk/debug/app-debug.apk`。本機 release 建置預設未簽章，需自行簽章後安裝。
+`nrfr-client/frontend` 使用 `npm ci` 及 `npm run build`。自動化檢查無法取代裝置上的 APN 保存、選取、行動數據與還原驗證。
 
-正式發布使用固定發布金鑰。GitHub Actions 的 `Publish signed Android release` 需設定簽章 secrets；沒有金鑰時不會改用 debug 簽章。詳見[正式版簽章與發布](docs/release-signing.md)。
-
-`hidden-api` 只提供編譯用的框架接口簽名，不會封裝進 APK。桌面快速啟動工具的原始碼保留於 `nrfr-client/`，其介紹及專案入口也指向此 fork。
-
-## 遇到問題
-
-請在[此 fork 的 Issues](https://github.com/alzpqm/Nrfr/issues) 附上：
-
-- 手機型號及 Android 版本／build。
-- Nrfr 與 Shizuku 版本。
-- 套用或還原時的錯誤文字，以及使用實體 SIM／eSIM、單卡或雙卡。
-- 是否能讀到新的設定、重啟後是否還保留。
-
-分享錯誤文字、截圖或紀錄前，請遮蔽電話號碼、ICCID、IMSI、裝置序號、帳號及其他個人資料。請勿上傳完整 SIM 資料或未整理的完整 logcat。
-
-實作細節與驗證方式見 [Android 17 相容性說明](docs/android-17-compatibility.md)。
-
-## 來源與授權
-
-- [Ackites/Nrfr](https://github.com/Ackites/Nrfr)：原始專案，由 Antkites 開發。
-- [ryfineZ/carrier-ims-for-pixel](https://github.com/ryfineZ/carrier-ims-for-pixel)：本次 instrumentation 權限委派的實作參考。
-- [Shizuku](https://shizuku.rikka.app/) 與 [AndroidHiddenApiBypass](https://github.com/LSPosed/AndroidHiddenApiBypass)：權限橋接與框架介面存取。
-
-採用 [Apache License 2.0](LICENSE)，保留原始作者的授權與歸屬。
+本專案沿用 [GPL-3.0](LICENSE) 授權。感謝原作者及上游貢獻者；Android 17 權限委派方式參考 [carrier-ims-for-pixel](https://github.com/ryfineZ/carrier-ims-for-pixel)。

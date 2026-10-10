@@ -33,6 +33,9 @@ class CarrierConfigInstrumentation : Instrumentation() {
         try {
             val request = PrivilegedCarrierConfigRunner.takeRequest(arguments)
                 ?: error("設定請求已過期或不屬於目前進程")
+            if (request is PrivilegedCarrierConfigRunner.Request.Override) {
+                NumericOverridePolicy.requireAllowed(request.operatorNumeric)
+            }
             val deadline = SystemClock.elapsedRealtime() + 3_000L
             while (!Shizuku.pingBinder() && SystemClock.elapsedRealtime() < deadline) Thread.sleep(100)
             check(Shizuku.pingBinder()) { "Shizuku 未執行" }
@@ -43,9 +46,6 @@ class CarrierConfigInstrumentation : Instrumentation() {
             )
             if (request is PrivilegedCarrierConfigRunner.Request.Override) {
                 permissions += Manifest.permission.MODIFY_PHONE_STATE
-                if (request.operatorNumeric != null || request.values == null) {
-                    permissions += Manifest.permission.WRITE_APN_SETTINGS
-                }
             }
             manager.startDelegateShellPermissionIdentity(Process.myUid(), permissions.toTypedArray())
             delegated = true
@@ -75,50 +75,36 @@ class CarrierConfigInstrumentation : Instrumentation() {
                     check(info != null) {
                         "所選 SIM 已失效，請重新選擇"
                     }
-                    val restored = if (request.values == null) CarrierIdentityAccess.restore(targetContext, info) else null
-                    var persistent = false
-                    val applyConfig = {
-                        // Identity changes may reload CarrierConfig. Apply country/name afterwards.
-                        persistent = if (request.values == null || !request.values.isEmpty) {
-                            CarrierOverridePolicy.apply(Build.VERSION.SDK_INT, request.values == null) {
-                                CarrierConfigAccess.override(request.subId, request.values, it, asShell = false)
-                            }
-                        } else false
-                        verifyConfig(request.subId, request.values, request.operatorNumeric ?: restored?.expectedNumeric)
-                    }
-                    if (request.operatorNumeric != null) {
-                        val previous = CarrierConfigAccess.read(targetContext, request.subId)
-                        try {
-                            CarrierIdentityAccess.apply(targetContext, info, request.operatorNumeric, applyConfig)
-                        } catch (error: Exception) {
-                            // Revert only fields owned by this app, preserving unrelated IMS settings.
-                            val fields = PersistableBundle().apply {
-                                putString(CarrierConfigAccess.COUNTRY_ISO, previous.getString(CarrierConfigAccess.COUNTRY_ISO))
-                                putBoolean(CarrierConfigAccess.CARRIER_NAME_OVERRIDE, previous.getBoolean(CarrierConfigAccess.CARRIER_NAME_OVERRIDE))
-                                putString(CarrierConfigAccess.CARRIER_NAME, previous.getString(CarrierConfigAccess.CARRIER_NAME))
-                            }
-                            try {
-                                CarrierOverridePolicy.apply(Build.VERSION.SDK_INT, false) {
-                                    CarrierConfigAccess.override(request.subId, fields, it, asShell = false)
+                    if (request.values == null) {
+                        val report = CarrierRestoreCoordinator(
+                            restoreIdentity = { CarrierIdentityAccess.restore(targetContext, info) },
+                            clearConfig = {
+                                CarrierOverridePolicy.apply(Build.VERSION.SDK_INT, true) {
+                                    CarrierConfigAccess.override(request.subId, null, it, asShell = false)
                                 }
-                                verifyConfig(request.subId, fields, null)
-                                if (error is ApnApplyException) {
-                                    CarrierIdentityAccess.verifyOriginalApns(targetContext, info, error.restoredSelection)
+                            },
+                            verifyIdentity = { CarrierIdentityAccess.verify(targetContext, info, it) },
+                            cleanupApns = { restored ->
+                                if (CarrierIdentityAccess.hasLegacyApns(targetContext, info)) {
+                                    // Request APN permissions only after the identity is confirmed.
+                                    checkNotNull(manager).startDelegateShellPermissionIdentity(Process.myUid(),
+                                        (permissions + Manifest.permission.WRITE_APN_SETTINGS).toTypedArray())
+                                    CarrierIdentityAccess.cleanupLegacyApns(targetContext, info, restored)
                                 }
-                            } catch (_: Exception) {
-                                error("套用失敗，設定回復尚未確認；備份已保留，請執行「還原設定」並核對 APN")
-                            }
-                            throw error
+                            },
+                            completeRestore = { CarrierIdentityAccess.completeRestore(targetContext, info, it) },
+                        ).restore()
+                        result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_PERSISTENT, report.persistent)
+                        result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_REQUIRES_RESTART, report.requiresRestart)
+                        result.putString(PrivilegedCarrierConfigRunner.RESULT_RESTORED_NUMERIC, report.restoredNumeric)
+                        result.putString(PrivilegedCarrierConfigRunner.RESULT_WARNING, report.warning)
+                    } else {
+                        val persistent = CarrierOverridePolicy.apply(Build.VERSION.SDK_INT, false) {
+                            CarrierConfigAccess.override(request.subId, request.values, it, asShell = false)
                         }
-                    } else applyConfig()
-                    if (restored?.apnChecked == true) {
-                        // Clearing CarrierConfig can reload data profiles again. Recheck after it.
-                        CarrierIdentityAccess.verifyOriginalApns(targetContext, info, restored.preferredApnId)
+                        verifyConfig(request.subId, request.values)
+                        result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_PERSISTENT, persistent)
                     }
-                    restored?.let { CarrierIdentityAccess.completeRestore(targetContext, info, it) }
-                    result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_PERSISTENT, persistent && request.operatorNumeric == null)
-                    result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_REQUIRES_RESTART, restored?.fullyCleared == false)
-                    result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_APN_CHECKED, request.operatorNumeric != null || restored?.apnChecked == true)
                 }
             }
             result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_SUCCESS, true)
@@ -133,26 +119,24 @@ class CarrierConfigInstrumentation : Instrumentation() {
                 } catch (error: Exception) {
                     Log.e("NrfrCarrierConfig", "Permission delegation cleanup failed", error)
                     result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_SUCCESS, false)
-                    result.putString(PrivilegedCarrierConfigRunner.RESULT_ERROR, "權限清理失敗: ${error.message}")
+                    result.putString(PrivilegedCarrierConfigRunner.RESULT_ERROR, "權限清理失敗，請重新啟動應用程式並核對目前設定")
                 }
             }
             finish(Activity.RESULT_OK, result)
         }
     }
 
-    private fun verifyConfig(subId: Int, expected: PersistableBundle?, operatorNumeric: String?) {
-        if (expected == null && operatorNumeric == null) return
-        val country = expected?.getString(CarrierConfigAccess.COUNTRY_ISO)?.takeIf { it.isNotEmpty() }
+    private fun verifyConfig(subId: Int, expected: PersistableBundle) {
+        val country = expected.getString(CarrierConfigAccess.COUNTRY_ISO)?.takeIf { it.isNotEmpty() }
         val telephony = targetContext.getSystemService(TelephonyManager::class.java)
             ?.createForSubscriptionId(subId)
         val deadline = SystemClock.elapsedRealtime() + 5_000L
         do {
             val actual = CarrierConfigAccess.read(targetContext, subId)
             @Suppress("DEPRECATION")
-            val configMatches = expected?.keySet()?.all { expected[it] == actual[it] } != false
+            val configMatches = expected.keySet().all { expected[it] == actual[it] }
             // Confirm the value apps see as well as the CarrierConfig bundle.
-            if (configMatches && (country == null || telephony?.simCountryIso == country) &&
-                (operatorNumeric == null || telephony?.simOperator == operatorNumeric)) return
+            if (configMatches && (country == null || telephony?.simCountryIso == country)) return
             Thread.sleep(100)
         } while (SystemClock.elapsedRealtime() < deadline)
         error("設定已提交，但系統回讀不一致，尚未確認生效；請重新讀取目前設定、核對 SIM 代碼或還原")
