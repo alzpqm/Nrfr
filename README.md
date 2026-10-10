@@ -10,7 +10,7 @@
 
 **1.1.3 已撤回**：APN 相容處理可能造成清單消失，APN 存取失敗也可能阻擋代碼還原。請勿繼續使用此版修改 MCC／MNC。目前正式版為 [1.1.2](https://github.com/alzpqm/Nrfr/releases/tag/v1.1.2)，其代碼覆寫仍可能影響 APN，建議只調整國家碼與名稱。
 
-[1.1.4-rc1 還原候選版](https://github.com/alzpqm/Nrfr/releases/tag/v1.1.4-rc1)將代碼還原與 APN 清理分開，並暫停新的 MCC／MNC 套用。候選版需要裝置驗證，尚未宣告 APN 問題已全面解決。詳見[更新說明](docs/releases/1.1.4-rc1.md)。
+[1.1.4-rc2 還原候選版](https://github.com/alzpqm/Nrfr/releases/tag/v1.1.4-rc2)將代碼還原與 APN 清理分開，並暫停新的 MCC／MNC 套用。候選版需要裝置驗證，尚未宣告 APN 問題已全面解決。詳見[更新說明](docs/releases/1.1.4-rc2.md)。
 
 ## 功能
 
@@ -31,7 +31,7 @@
 3. 選擇國家碼及業者名稱，點選「套用設定」，核對操作結果。
 4. 如需清除覆寫，選擇同一張 SIM，點選「還原設定」，依提示重新啟動手機並核對原代碼、APN 選取及行動數據。
 
-1.1.4-rc1 沿用 1.1.1 起的固定發布簽章，可覆蓋安裝 1.1.2／1.1.3，保留本機備份；請勿為升級先解除安裝。1.0.4／1.1.0 測試 APK 的簽章不同，移除前須先還原並依提示重啟。
+1.1.4-rc2 沿用 1.1.1 起的固定發布簽章，可覆蓋安裝 1.1.2／1.1.3，保留本機備份；請勿為升級先解除安裝。1.0.4／1.1.0 測試 APK 的簽章不同，移除前須先還原並依提示重啟。
 
 還原會先處理原 SIM 代碼與國家碼／名稱覆寫，再嘗試清理舊相容 APN。APN 權限、清單或選取異常會另列提示；原代碼只有在回讀一致時才標示已確認。沒有本機回復紀錄的項目不會自動刪除。
 
@@ -55,4 +55,4 @@ Android 8 以上；代碼還原需要 Android 10 以上。Android 16／17 使用
 
 `nrfr-client/frontend` 使用 `npm ci` 及 `npm run build`。自動化檢查無法取代裝置上的 APN 保存、選取、行動數據與還原驗證。
 
-本專案沿用 [GPL-3.0](LICENSE) 授權。感謝原作者及上游貢獻者；Android 17 權限委派方式參考 [carrier-ims-for-pixel](https://github.com/ryfineZ/carrier-ims-for-pixel)。
+本專案沿用 [Apache License 2.0](LICENSE) 授權。感謝原作者及上游貢獻者；Android 17 權限委派方式參考 [carrier-ims-for-pixel](https://github.com/ryfineZ/carrier-ims-for-pixel)。
