@@ -6,6 +6,16 @@
 
 [下載 APK](https://github.com/alzpqm/Nrfr/releases) · [回報問題](https://github.com/alzpqm/Nrfr/issues) · [原始碼](https://github.com/alzpqm/Nrfr)
 
+## 1.1.1 正式版
+
+- 修正雙卡切換時沿用上一張 SIM 的國家碼、業者與 MCC／MNC 輸入；切換卡片會清空待套用草稿。
+- 分別標示「目前讀取值」與「待套用設定」，操作結果列出所選 SIM 及已確認的欄位。
+- 同一張卡重新讀取會保留待套用內容；還原後會清空草稿及自訂模式。
+- SIM 代碼回讀成功會明示「連線網路／基地台 MCC／MNC 未修改」，避免誤認所有 App 都會變更。
+- 正式 APK 使用固定發布簽章及 R8 release 建置，不再自動發布 debug 測試 APK。
+
+[下載 1.1.1 正式 APK](https://github.com/alzpqm/Nrfr/releases/download/v1.1.1/nrfr-1.1.1-release.apk) · [更新說明](docs/releases/1.1.1.md)
+
 ## 1.1.0 新增功能
 
 - 自訂 5／6 位電信業者代碼，例如 `45402`、`23410`、`310260`；保留 MNC 前導零。
@@ -29,12 +39,12 @@
 
 1. 從[此 fork 的 Releases](https://github.com/alzpqm/Nrfr/releases) 下載 APK。
 2. 安裝並啟動 [Shizuku](https://shizuku.rikka.app/)，開啟 Nrfr 後授權。
-3. 選擇需要調整的 SIM，設定兩位英文字母國家碼，例如 `US` 或 `JP`；可同時設定電信業者名稱。也可選擇預設電信業者自動填入欄位。
+3. 選擇需要調整的 SIM，設定兩位英文字母國家碼，例如 `US` 或 `JP`；可同時設定電信業者名稱。也可選擇預設電信業者自動填入欄位。切換 SIM 會清空草稿，請為新選擇的卡重新輸入。
 4. 若要修改代碼，勾選「修改 SIM 電信業者代碼」，輸入 5／6 位 MCC＋MNC；留意系統可能重載電信設定。
-5. 點選「套用設定」，等待系統回讀完成，再確認目前設定。
+5. 點選「套用設定」，等待系統回讀完成，再確認「目前讀取值」與「上次操作結果」。待套用輸入不代表目前已生效的值。
 6. 如需還原，選擇同一張 SIM，點選「還原設定」。
 
-若安裝器提示 APK 簽章不一致，請先移除舊版再安裝。移除 App 不會自動還原系統的 CarrierConfig 覆寫。
+從 1.0.4／1.1.0 測試 APK 升級到正式版時，請先在舊 App 還原設定，依提示重啟手機，再移除測試版並安裝正式 APK。兩者簽章不同，不能直接覆蓋安裝；後續正式版沿用固定簽章。移除 App 不會自動還原系統的 CarrierConfig 覆寫，也會刪除本機代碼備份。
 
 代碼覆寫的目標是 **Android SIM 讀取介面**（`TelephonyManager.getSimOperator()`），不會改寫實體 SIM 內容或基地台註冊網路。其他 App 若讀取訂閱資料、連線網路、IMSI、快取或伺服器資料，可能仍顯示原值；套用成功不代表任何特定 App 都會接受該地區設定。
 
@@ -64,6 +74,8 @@
 ```
 
 可安裝的 debug APK 位於 `app/build/outputs/apk/debug/app-debug.apk`。本機 release 建置預設未簽章，需自行簽章後安裝。
+
+正式發布使用已備份的固定發布金鑰。GitHub Actions 的 `Publish signed Android release` 需先設定簽章 secrets，再從 master 手動執行；沒有金鑰時不會改用 debug 簽章。詳見[正式版簽章與發布](docs/release-signing.md)。
 
 `hidden-api` 只提供編譯用的框架接口簽名，不會封裝進 APK。桌面快速啟動工具的原始碼保留於 `nrfr-client/`，其介紹及專案入口也指向此 fork。
 

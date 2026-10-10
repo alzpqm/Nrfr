@@ -1,162 +1,75 @@
-name: Build Release
+name: Publish signed Android release
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
 
-# 添加权限配置
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build:
-    runs-on: windows-latest
+  checks:
+    uses: ./.github/workflows/android.yml
+
+  release:
+    needs: checks
+    if: github.repository == 'alzpqm/Nrfr' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          fetch-depth: 0
-
-      # 获取版本号和提交信息
-      - name: Get Version Info
-        id: version
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-
-          if git rev-list --tags --max-count=1 > /dev/null 2>&1; then
-              LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
-
-              # 获取所有提交并过滤掉CI相关提交和文档提交
-              ALL_COMMITS=$(git log --pretty=format:"%h %s (%an)" $LAST_TAG..HEAD | grep -v -E "ci:|docs:" || true)
-
-              # 分别获取不同类型的提交
-              FEAT_COMMITS=$(echo "$ALL_COMMITS" | grep "^[a-f0-9]\+ feat:" || true)
-              FIX_COMMITS=$(echo "$ALL_COMMITS" | grep "^[a-f0-9]\+ fix:" || true)
-              OTHER_COMMITS=$(echo "$ALL_COMMITS" | grep -v "^[a-f0-9]\+ \(feat:\|fix:\)" || true)
-
-              # 组装changelog
-              CHANGELOG=""
-              if [ ! -z "$FEAT_COMMITS" ]; then
-                  CHANGELOG+="### 功能改进\n$FEAT_COMMITS\n"
-              fi
-              if [ ! -z "$FIX_COMMITS" ]; then
-                  CHANGELOG+="### 问题修复\n$FIX_COMMITS\n"
-              fi
-              if [ ! -z "$OTHER_COMMITS" ]; then
-                  CHANGELOG+="### 其他更新\n$OTHER_COMMITS"
-              fi
-          else
-              CHANGELOG="### 首次发布\n$(git log --pretty=format:"- %h %s (%an)" | grep -v "ci:" || true)"
-          fi
-
-          # 如果changelog为空，添加默认信息
-          if [ -z "$CHANGELOG" ]; then
-              CHANGELOG="### 无更新内容"
-          fi
-
-          # 输出
-          echo -e "$CHANGELOG"
-
-          # 将 changelog 写入檔案
-          echo -e "$CHANGELOG" > CHANGELOG.md
-        shell: bash
-
-      # 设置 Java 环境
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "21"
-
-      # 设置 Android SDK
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: '16111833'
-
-      - name: Install Android 17 SDK
-        run: sdkmanager 'platforms;android-37.2' 'build-tools;37.0.0'
-        shell: bash
-
-      # 构建 Android APK
-      - name: Build Android APK
-        run: |
-          chmod +x ./gradlew
-          ./gradlew :app:testDebugUnitTest :app:assembleDebug
-        shell: bash
-
-      # 设置 Go 环境
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - run: sdkmanager 'build-tools;37.0.0'
+      - uses: actions/download-artifact@v4
         with:
-          go-version: "1.23"
-
-      # 设置 Node.js 环境
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "21"
-
-      # 安装 Wails
-      - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      # 构建 Wails 应用
-      - name: Build Wails App
-        run: |
-          cd nrfr-client/frontend
-          npm install
-          cd ..
-          wails build
+          name: nrfr-android-release-unsigned
+          path: apk
+      - name: Prepare release metadata
         shell: bash
-
-      # 下载最新的 Shizuku APK
-      - name: Download Shizuku APK
         run: |
-          mkdir -p nrfr-client/build/bin/resources
-          curl -L $(curl -s https://api.github.com/repos/RikkaApps/Shizuku/releases/latest | grep "browser_download_url.*apk" | cut -d '"' -f 4) -o nrfr-client/build/bin/resources/shizuku.apk
+          nrfr_version=$(python3 -c 'import pathlib,re; print(re.search(r"versionName = \"([0-9.]+)\"", pathlib.Path("app/build.gradle.kts").read_text()).group(1))')
+          test -f "docs/releases/${nrfr_version}.md"
+          echo "NRFR_RELEASE_VERSION=${nrfr_version}" >> "$GITHUB_ENV"
+          echo "NRFR_RELEASE_TAG=v${nrfr_version}" >> "$GITHUB_ENV"
+      - name: Sign release APK
         shell: bash
-
-      # 复制 Android APK
-      - name: Copy Android APK
-        run: |
-          cp app/build/outputs/apk/debug/app-debug.apk nrfr-client/build/bin/resources/nrfr.apk
-          cp app/build/outputs/apk/debug/app-debug.apk nrfr-${{ steps.version.outputs.version }}.apk
-        shell: bash
-
-      # 下载 platform-tools
-      - name: Download platform-tools
-        run: |
-          mkdir -p nrfr-client/build/bin/platform-tools
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            curl -L https://dl.google.com/android/repository/platform-tools-latest-windows.zip -o platform-tools.zip
-          elif [ "$RUNNER_OS" == "Linux" ]; then
-            curl -L https://dl.google.com/android/repository/platform-tools-latest-linux.zip -o platform-tools.zip
-          else
-            curl -L https://dl.google.com/android/repository/platform-tools-latest-darwin.zip -o platform-tools.zip
-          fi
-          unzip platform-tools.zip
-          cp -r platform-tools/* nrfr-client/build/bin/platform-tools/
-          rm -rf platform-tools platform-tools.zip
-        shell: bash
-
-      # 打包发布檔案
-      - name: Create Release Archive
-        run: |
-          cd nrfr-client/build/bin
-          7z a "../../nrfr-${{ steps.version.outputs.version }}-release.zip" ./*
-        shell: bash
-
-      # 创建 Release
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: |
-            nrfr-client/nrfr-${{ steps.version.outputs.version }}-release.zip
-            nrfr-${{ steps.version.outputs.version }}.apk
-          body_path: CHANGELOG.md
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NRFR_RELEASE_KEYSTORE_BASE64: ${{ secrets.NRFR_RELEASE_KEYSTORE_BASE64 }}
+          NRFR_RELEASE_STORE_PASSWORD: ${{ secrets.NRFR_RELEASE_STORE_PASSWORD }}
+          NRFR_RELEASE_KEY_PASSWORD: ${{ secrets.NRFR_RELEASE_KEY_PASSWORD }}
+        run: |
+          test -n "$NRFR_RELEASE_KEYSTORE_BASE64" && test -n "$NRFR_RELEASE_STORE_PASSWORD" && test -n "$NRFR_RELEASE_KEY_PASSWORD" || {
+            echo "請依 docs/release-signing.md 設定固定發布簽章；不會用 debug 簽章替代。"
+            exit 1
+          }
+          umask 077
+          nrfr_signing_dir=$(mktemp -d "$RUNNER_TEMP/nrfr-signing.XXXXXX")
+          trap 'rm -rf "$nrfr_signing_dir"' EXIT
+          printf '%s' "$NRFR_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$nrfr_signing_dir/nrfr-release.p12"
+          "$ANDROID_HOME/build-tools/37.0.0/zipalign" -P 16 -f 4 apk/app-release-unsigned.apk "$nrfr_signing_dir/aligned.apk"
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" sign \
+            --ks "$nrfr_signing_dir/nrfr-release.p12" --ks-key-alias nrfr-release \
+            --ks-pass env:NRFR_RELEASE_STORE_PASSWORD --key-pass env:NRFR_RELEASE_KEY_PASSWORD \
+            --v4-signing-enabled false --out "nrfr-${NRFR_RELEASE_VERSION}-release.apk" "$nrfr_signing_dir/aligned.apk"
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "nrfr-${NRFR_RELEASE_VERSION}-release.apk"
+          "$ANDROID_HOME/build-tools/37.0.0/zipalign" -c -P 16 4 "nrfr-${NRFR_RELEASE_VERSION}-release.apk"
+          sha256sum "nrfr-${NRFR_RELEASE_VERSION}-release.apk" > SHA256SUMS
+      - name: Publish stable release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$NRFR_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "版本已發布；保留原有 APK，不覆蓋已發布的檔案。"
+            exit 1
+          fi
+          gh release create "$NRFR_RELEASE_TAG" "nrfr-${NRFR_RELEASE_VERSION}-release.apk" SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft \
+            --title "Nrfr ${NRFR_RELEASE_VERSION} — 正式版" --notes-file "docs/releases/${NRFR_RELEASE_VERSION}.md"
+          gh release edit "$NRFR_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest

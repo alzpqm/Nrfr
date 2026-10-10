@@ -14,8 +14,8 @@ android {
         applicationId = "com.github.nrfr"
         minSdk = 26
         targetSdk = 37
-        versionCode = 5 //版本更新 +1
-        versionName = "1.1.0" //同步更新版本号 nrfr-client/app.go
+        versionCode = 6 // 每次發布遞增
+        versionName = "1.1.1" // 同步更新 nrfr-client/app.go
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

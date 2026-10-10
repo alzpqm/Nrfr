@@ -35,22 +35,17 @@ import java.util.Locale
 @Composable
 fun MainScreen(onShowAbout: () -> Unit) {
     val context = LocalContext.current
-    var selectedSimCard by remember { mutableStateOf<SimCardInfo?>(null) }
-    var selectedCountryCode by remember { mutableStateOf("") }
-    var customCountryCode by remember { mutableStateOf("") }
-    var isCustomCountryCode by remember { mutableStateOf(false) }
-    var selectedCarrier by remember { mutableStateOf<PresetCarriers.CarrierPreset?>(null) }
-    var customCarrierName by remember { mutableStateOf("") }
-    var operatorNumeric by remember { mutableStateOf("") }
-    var changeNumeric by remember { mutableStateOf(false) }
+    var editor by remember { mutableStateOf(SimEditorState()) }
     var isSimCardMenuExpanded by remember { mutableStateOf(false) }
-    var isCountryCodeMenuExpanded by remember { mutableStateOf(false) }
-    var isCarrierMenuExpanded by remember { mutableStateOf(false) }
+    var isCountryCodeMenuExpanded by remember(editor.subId) { mutableStateOf(false) }
+    var isCarrierMenuExpanded by remember(editor.subId) { mutableStateOf(false) }
     var refreshTrigger by remember { mutableStateOf(0) }
     var simCards by remember { mutableStateOf<List<SimCardInfo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isApplying by remember { mutableStateOf(false) }
     var simError by remember { mutableStateOf<String?>(null) }
+    val selectedSimCard = simCards.find { it.subId == editor.subId }
+    val canEdit = selectedSimCard != null && !isLoading && !isApplying
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(context, refreshTrigger) {
@@ -58,12 +53,12 @@ fun MainScreen(onShowAbout: () -> Unit) {
         simError = null
         try {
             simCards = CarrierConfigManager.getSimCards(context)
-            selectedSimCard = simCards.find { it.subId == selectedSimCard?.subId }
+            editor = editor.selectSim(editor.subId.takeIf { id -> simCards.any { it.subId == id } })
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
             simCards = emptyList()
-            selectedSimCard = null
+            editor = editor.selectSim(null)
             simError = error.message ?: "讀取 SIM 卡失敗"
         } finally {
             isLoading = false
@@ -122,7 +117,7 @@ fun MainScreen(onShowAbout: () -> Unit) {
                 isExpanded = isSimCardMenuExpanded,
                 onExpandedChange = { isSimCardMenuExpanded = it },
                 enabled = !isLoading && !isApplying,
-                onSimCardSelected = { selectedSimCard = it }
+                onSimCardSelected = { editor = editor.selectSim(it.subId) }
             )
 
             // 顯示目前選中的 SIM 卡的設定資訊
@@ -130,33 +125,44 @@ fun MainScreen(onShowAbout: () -> Unit) {
                 CurrentConfigCard(simCard = simCard)
             }
 
+            editor.operationMessage?.let { message ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("上次操作結果", style = MaterialTheme.typography.titleMedium)
+                        Text(message)
+                    }
+                }
+            }
+            Text(
+                selectedSimCard?.let { "待套用設定（SIM ${it.slot}）" } ?: "請先選擇 SIM 卡",
+                style = MaterialTheme.typography.titleMedium,
+            )
+
             // 國家碼選擇
             CountryCodeSelector(
-                selectedCountryCode = selectedCountryCode,
-                isCustomCountryCode = isCustomCountryCode,
-                customCountryCode = customCountryCode,
+                selectedCountryCode = editor.selectedCountryCode,
+                isCustomCountryCode = editor.isCustomCountryCode,
+                customCountryCode = editor.customCountryCode,
                 isExpanded = isCountryCodeMenuExpanded,
                 onExpandedChange = { isCountryCodeMenuExpanded = it },
                 onCountryCodeSelected = { code ->
-                    selectedCountryCode = code
-                    isCustomCountryCode = false
+                    editor = editor.copy(selectedCountryCode = code, isCustomCountryCode = false)
                 },
-                enabled = !isLoading && !isApplying,
+                enabled = canEdit,
                 onCustomSelected = {
-                    isCustomCountryCode = true
-                    selectedCountryCode = customCountryCode
+                    editor = editor.copy(isCustomCountryCode = true, selectedCountryCode = editor.customCountryCode)
                 }
             )
 
             // 自訂國家碼輸入框
-            if (isCustomCountryCode) {
+            if (editor.isCustomCountryCode) {
                 CustomCountryCodeInput(
-                    value = customCountryCode,
-                    enabled = !isLoading && !isApplying,
+                    value = editor.customCountryCode,
+                    enabled = canEdit,
                     onValueChange = {
                         if (it.length <= 2 && it.all { char -> char in 'A'..'Z' || char in 'a'..'z' }) {
-                            customCountryCode = it.uppercase(Locale.ROOT)
-                            selectedCountryCode = it.uppercase(Locale.ROOT)
+                            editor = editor.copy(customCountryCode = it.uppercase(Locale.ROOT),
+                                selectedCountryCode = it.uppercase(Locale.ROOT))
                         }
                     }
                 )
@@ -164,50 +170,48 @@ fun MainScreen(onShowAbout: () -> Unit) {
 
             // 電信業者選擇
             CarrierSelector(
-                selectedCarrier = selectedCarrier,
+                selectedCarrier = editor.selectedCarrier,
                 isExpanded = isCarrierMenuExpanded,
                 onExpandedChange = { isCarrierMenuExpanded = it },
-                enabled = !isLoading && !isApplying,
+                enabled = canEdit,
                 onCarrierSelected = { carrier ->
-                    selectedCarrier = carrier
-                    customCarrierName = carrier.displayName
-                    operatorNumeric = carrier.operatorNumeric
+                    editor = editor.copy(selectedCarrier = carrier, customCarrierName = carrier.displayName,
+                        operatorNumeric = carrier.operatorNumeric)
                     if (carrier.region.isNotEmpty()) {
-                        selectedCountryCode = carrier.region
-                        isCustomCountryCode = false
+                        editor = editor.copy(selectedCountryCode = carrier.region, isCustomCountryCode = false)
                     }
                 }
             )
 
             // 自訂電信業者名稱輸入框
-            if (selectedCarrier?.name == "自訂") {
+            if (editor.selectedCarrier?.name == "自訂") {
                 CustomCarrierNameInput(
-                    value = customCarrierName,
-                    enabled = !isLoading && !isApplying,
-                    onValueChange = { customCarrierName = it }
+                    value = editor.customCarrierName,
+                    enabled = canEdit,
+                    onValueChange = { editor = editor.copy(customCarrierName = it) }
                 )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = changeNumeric, onCheckedChange = { changeNumeric = it },
-                    enabled = !isLoading && !isApplying && Build.VERSION.SDK_INT >= 29)
+                Checkbox(checked = editor.changeNumeric, onCheckedChange = { editor = editor.copy(changeNumeric = it) },
+                    enabled = canEdit && Build.VERSION.SDK_INT >= 29)
                 Text("修改 SIM 電信業者代碼")
             }
             if (Build.VERSION.SDK_INT < 29) Text("電信業者代碼覆寫需要 Android 10 以上。")
-            if (changeNumeric) {
-                val valid = OperatorNumeric.isValid(operatorNumeric.trim())
+            if (editor.changeNumeric) {
+                val valid = OperatorNumeric.isValid(editor.operatorNumeric.trim())
                 OutlinedTextField(
-                    value = operatorNumeric, onValueChange = { operatorNumeric = it },
+                    value = editor.operatorNumeric, onValueChange = { editor = editor.copy(operatorNumeric = it) },
                     label = { Text("電信業者代碼（MCC＋MNC）") },
                     placeholder = { Text("45402、23410、310260") },
-                    supportingText = { Text(if (valid) OperatorNumeric.parse(operatorNumeric).let {
+                    supportingText = { Text(if (valid) OperatorNumeric.parse(editor.operatorNumeric).let {
                         "MCC：${it.mcc}　MNC：${it.mnc}"
                     } else "請輸入 5 或 6 位半形數字，前導零會保留。") },
-                    isError = operatorNumeric.isNotEmpty() && !valid, singleLine = true,
+                    isError = editor.operatorNumeric.isNotEmpty() && !valid, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    enabled = !isLoading && !isApplying, modifier = Modifier.fillMaxWidth(),
+                    enabled = canEdit, modifier = Modifier.fillMaxWidth(),
                 )
-                Text("此欄位調整 SIM 電信業者代碼。其他 App 顯示的目前連線網路或基地台 MCC／MNC，仍以實際網路資料為準。",
+                Text("只修改 SIM 讀取代碼。連線網路／基地台 MCC／MNC 未修改；DevCheck 等 App 若使用網路資料，仍會顯示實際代碼。",
                     style = MaterialTheme.typography.bodySmall)
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -215,31 +219,28 @@ fun MainScreen(onShowAbout: () -> Unit) {
             // 按鈕行
             ActionButtons(
                 selectedSimCard = selectedSimCard,
-                selectedCountryCode = selectedCountryCode,
-                isCustomCountryCode = isCustomCountryCode,
-                customCountryCode = customCountryCode,
-                selectedCarrier = selectedCarrier,
-                customCarrierName = customCarrierName,
-                enabled = !isLoading && !isApplying,
-                changeNumeric = changeNumeric,
-                operatorNumeric = operatorNumeric,
+                selectedCountryCode = editor.selectedCountryCode,
+                isCustomCountryCode = editor.isCustomCountryCode,
+                customCountryCode = editor.customCountryCode,
+                selectedCarrier = editor.selectedCarrier,
+                customCarrierName = editor.customCarrierName,
+                enabled = canEdit,
+                changeNumeric = editor.changeNumeric,
+                operatorNumeric = editor.operatorNumeric,
                 onReset = { simCard ->
+                    editor = editor.copy(operationMessage = null)
                     isApplying = true
                     scope.launch {
                         try {
                             val result = CarrierConfigManager.resetCarrierConfig(context, simCard.subId)
                             val message = if (result.requiresRestart) "原本的電信代碼已回復；請重啟手機，完整結束系統的測試覆寫狀態" else if (result.persistent) "設定已還原" else "暫時覆寫已清除，請確認重新啟動後的設定"
-                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                            selectedCountryCode = ""
-                            customCountryCode = ""
-                            selectedCarrier = null
-                            customCarrierName = ""
-                            operatorNumeric = ""
-                            changeNumeric = false
+                            editor = SimEditorState(subId = simCard.subId, operationMessage = "SIM ${simCard.slot}：$message")
+                            Toast.makeText(context, "SIM ${simCard.slot}：$message", Toast.LENGTH_LONG).show()
                         } catch (error: CancellationException) {
                             throw error
                         } catch (error: Exception) {
-                            Toast.makeText(context, "還原失敗: ${error.message}", Toast.LENGTH_LONG).show()
+                            editor = editor.copy(operationMessage = "SIM ${simCard.slot} 還原失敗：${error.message}")
+                            Toast.makeText(context, editor.operationMessage, Toast.LENGTH_LONG).show()
                         } finally {
                             isApplying = false
                             refreshTrigger += 1
@@ -247,25 +248,38 @@ fun MainScreen(onShowAbout: () -> Unit) {
                     }
                 },
                 onSave = { simCard ->
-                    val carrierName = if (selectedCarrier?.name == "自訂") {
-                        customCarrierName.takeIf { it.isNotEmpty() }
+                    val carrierName = if (editor.selectedCarrier?.name == "自訂") {
+                        editor.customCarrierName.takeIf { it.isNotEmpty() }
                     } else {
-                        selectedCarrier?.displayName
+                        editor.selectedCarrier?.displayName
                     }
-                    val countryCode = if (isCustomCountryCode) customCountryCode else selectedCountryCode
-                    val chosenNumeric = if (changeNumeric) operatorNumeric.trim() else null
+                    val countryCode = if (editor.isCustomCountryCode) editor.customCountryCode else editor.selectedCountryCode
+                    val chosenNumeric = if (editor.changeNumeric) editor.operatorNumeric.trim() else null
+                    editor = editor.copy(operationMessage = null)
                     isApplying = true
                     scope.launch {
                         try {
                             val result = CarrierConfigManager.setCarrierConfig(
                                 context, simCard.subId, countryCode, carrierName, chosenNumeric,
                             )
-                            val message = if (result.persistent) "設定已儲存並確認生效" else "設定已生效，重新啟動或更換 SIM 後可能需要重新套用"
-                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                            val verified = Build.VERSION.SDK_INT >= 29
+                            val message = buildString {
+                                append("SIM ${simCard.slot}：${if (verified) "以下讀取值已回讀確認" else "以下設定已提交"}。")
+                                if (countryCode.isNotEmpty()) append("\nSIM 國家碼：${countryCode.lowercase(Locale.ROOT)}")
+                                carrierName?.let { append("\n電信業者名稱：$it") }
+                                chosenNumeric?.let {
+                                    append("\nSIM 電信業者代碼：$it")
+                                    append("\n連線網路／基地台 MCC／MNC 未修改。")
+                                }
+                                append(if (result.persistent) "\n設定已儲存。" else "\n重新啟動、更換 SIM 或系統重載後可能需要重新套用。")
+                            }
+                            editor = editor.copy(operationMessage = message)
+                            Toast.makeText(context, "SIM ${simCard.slot}：${if (verified) "回讀已確認" else "設定已提交"}", Toast.LENGTH_LONG).show()
                         } catch (error: CancellationException) {
                             throw error
                         } catch (error: Exception) {
-                            Toast.makeText(context, "套用失敗： ${error.message}", Toast.LENGTH_LONG).show()
+                            editor = editor.copy(operationMessage = "SIM ${simCard.slot} 套用失敗：${error.message}")
+                            Toast.makeText(context, editor.operationMessage, Toast.LENGTH_LONG).show()
                         } finally {
                             isApplying = false
                             refreshTrigger += 1
@@ -296,7 +310,7 @@ private fun SimCardSelector(
             onValueChange = {},
             enabled = enabled,
             readOnly = true,
-            label = { Text("選擇SIM卡") },
+            label = { Text("選擇 SIM 卡") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpanded) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -351,15 +365,15 @@ private fun CurrentConfigCard(simCard: SimCardInfo) {
                 .padding(16.dp)
         ) {
             Text(
-                "目前設定",
+                "目前讀取值（SIM ${simCard.slot}）",
                 style = MaterialTheme.typography.titleMedium
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text("SIM 電信業者代碼：${simCard.simOperator.ifEmpty { "未取得" }}")
             Text("SIM 國家碼：${simCard.simCountryIso.ifEmpty { "未取得" }}")
             Text("訂閱資料代碼：${simCard.subscriptionOperator.ifEmpty { "未取得" }}")
-            Text("連線網路代碼：${simCard.networkOperator.ifEmpty { "未連線／未取得" }}")
-            Text("SIM 代碼為一般 App 的 SIM 讀取值；訂閱資料與連線網路是不同來源。",
+            Text("連線網路代碼（未修改）：${simCard.networkOperator.ifEmpty { "未連線／未取得" }}")
+            Text("SIM、訂閱資料與連線網路是不同讀取來源；只核對已選擇修改的 SIM 讀取值。",
                 style = MaterialTheme.typography.bodySmall)
             Spacer(modifier = Modifier.height(8.dp))
             if (simCard.currentConfig.isEmpty()) {

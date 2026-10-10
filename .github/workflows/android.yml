@@ -1,10 +1,11 @@
-name: Android checks and test release
+name: Android checks
 
 on:
   push:
     branches: [master, 'fix/**']
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -46,7 +47,7 @@ jobs:
           import glob, os, pathlib, xml.etree.ElementTree as ET
           reports = [ET.parse(p).getroot() for p in glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml")]
           counts = {key: sum(int(r.attrib.get(key, 0)) for r in reports) for key in ("tests", "failures", "errors", "skipped")}
-          assert counts["tests"] >= 22 and counts["failures"] == counts["errors"] == counts["skipped"] == 0, counts
+          assert counts["tests"] >= 26 and counts["failures"] == counts["errors"] == counts["skipped"] == 0, counts
           with pathlib.Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
               summary.write(f"Android unit tests: {counts['tests']} passed. Lint and debug/release builds completed.\n")
           PY
@@ -61,54 +62,7 @@ jobs:
         with:
           name: nrfr-android17-debug
           path: app/build/outputs/apk/debug/app-debug.apk
-
-  test-release:
-    needs: [android, frontend]
-    if: >-
-      github.repository == 'alzpqm/Nrfr' && github.ref == 'refs/heads/master' &&
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: nrfr-android17-debug
-          path: apk
-      - name: Prepare test APK
-        shell: bash
-        run: |
-          nrfr_version=$(python3 -c 'import pathlib,re; print(re.search(r"versionName = \"([0-9.]+)\"", pathlib.Path("app/build.gradle.kts").read_text()).group(1))')
-          echo "NRFR_TEST_TAG=android17-test-${nrfr_version}" >> "$GITHUB_ENV"
-          echo "NRFR_TEST_VERSION=${nrfr_version}" >> "$GITHUB_ENV"
-          mv apk/app-debug.apk "nrfr-${nrfr_version}-android17.apk"
-          sha256sum "nrfr-${nrfr_version}-android17.apk" > SHA256SUMS
-          cat > release-notes.md <<'NOTES'
-          此 fork 的 Nrfr 1.1.0 正體中文／MCC／MNC 功能測試版，沿用 Android 17 Shizuku 免 root 相容流程。
-
-          - 新增 5／6 位 MCC＋MNC 代碼覆寫與回讀，支援 45402、23410、310260，保留前導零。
-          - 新增修改前備份與還原；無完整清除介面的系統會提示重啟。
-          - 提供 177 組代碼、45 個國家／地區的可搜尋預設。
-          - Android App 與桌面工具完整改用正體中文。
-          - 使用 instrumentation 臨時委派電話權限，以 App UID 寫入，並回讀設定與 SIM 國家碼。
-          - 升級至 Android 17 SDK API 37.2、targetSdk 37、AGP 9.4.1 與 Gradle 9.6.0。
-          - 重寫 README、App 與桌面工具的介紹，移除舊 X 連結，入口統一指向 alzpqm/Nrfr。
-          - 發布前執行單元測試、Lint、debug／release APK 編譯與桌面前端建置。
-
-          APK 使用 debug 簽章，可直接安裝；簽章與已安裝版本不同時須先移除舊版。
-          代碼修改可能重載電信設定，套用後請確認行動數據及通話。解除安裝前請先還原或重啟，避免失去本機備份。Android 16／17 的臨時設定可能在重啟或重載後需要重新套用。
-          移除 App 不會自動還原系統設定；「還原」可能清除同一 SIM 上其他工具的 CarrierConfig 覆寫。
-          NOTES
-      - name: Publish test release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "$NRFR_TEST_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Test release already exists; retaining its published APK."
-          else
-            gh release create "$NRFR_TEST_TAG" "nrfr-${NRFR_TEST_VERSION}-android17.apk" SHA256SUMS \
-              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-              --title "Nrfr ${NRFR_TEST_VERSION} — 正體中文／MCC-MNC 功能測試版" --notes-file release-notes.md
-          fi
+          name: nrfr-android-release-unsigned
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
