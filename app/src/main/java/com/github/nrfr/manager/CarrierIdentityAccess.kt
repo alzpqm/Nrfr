@@ -17,7 +17,8 @@ import org.json.JSONObject
 @SuppressLint("MissingPermission")
 internal object CarrierIdentityAccess {
     private const val PREFS = "carrier_identity_originals"
-    data class RestoreResult(val expectedNumeric: String?, val fullyCleared: Boolean = true)
+    data class RestoreResult(val expectedNumeric: String?, val fullyCleared: Boolean = true,
+        val apnChecked: Boolean = false, val preferredApnId: Long? = null)
     private fun service(): Any {
         val binder = ServiceManager.getService(Context.TELEPHONY_SERVICE) ?: error("電話服務無法使用")
         return Class.forName("com.android.internal.telephony.ITelephony\$Stub")
@@ -29,15 +30,16 @@ internal object CarrierIdentityAccess {
         check(!identity.isNullOrEmpty()) { "無法辨識這張 SIM，尚未執行代碼覆寫或還原；請確認 SIM 已就緒" }
         return MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
     }
-    private fun set(phone: Any, subId: Int, numeric: String, spn: String?) {
+    private fun set(phone: Any, subId: Int, numeric: String) {
         val method = phone.javaClass.methods.filter {
             it.name == "setCarrierTestOverride" && it.parameterTypes.size in listOf(8, 10) &&
                 it.parameterTypes.first() == Int::class.javaPrimitiveType &&
                 it.parameterTypes.drop(1).all { type -> type == String::class.java }
         }.maxByOrNull { it.parameterTypes.size } ?: error("此系統不支援電信業者代碼覆寫")
-        invoke { method.invoke(phone, *CarrierIdentityArguments.build(method.parameterTypes.size, subId, numeric, spn)) }
+        // Keep the real SPN for MVNO/APN matching. Display names are handled by CarrierConfig.
+        invoke { method.invoke(phone, *CarrierIdentityArguments.build(method.parameterTypes.size, subId, numeric, null)) }
     }
-    fun apply(context: Context, info: SubscriptionInfo, numeric: String, displayName: String?) {
+    fun apply(context: Context, info: SubscriptionInfo, numeric: String, complete: () -> Unit) {
         val code = OperatorNumeric.parse(numeric).value
         val telephony = (context.getSystemService(TelephonyManager::class.java) ?: error("電話服務無法使用"))
             .createForSubscriptionId(info.subscriptionId)
@@ -47,9 +49,11 @@ internal object CarrierIdentityAccess {
             val original = telephony.simOperator.orEmpty()
             check(OperatorNumeric.isValid(original)) { "無法讀取原本的電信業者代碼，尚未執行覆寫；請確認 SIM 已就緒" }
             val backup = JSONObject().put("numeric", original).put("name", telephony.simOperatorName.orEmpty())
+                .put("carrier_id", telephony.simSpecificCarrierId)
             check(prefs.edit().putString(key, backup.toString()).commit()) { "無法備份原本的電信設定，尚未執行覆寫" }
         }
-        set(service(), info.subscriptionId, code, displayName ?: telephony.simOperatorName)
+        val original = JSONObject(checkNotNull(prefs.getString(key, null)))
+        coordinator(context, info, key, original, service()).apply(code, complete)
     }
     fun restore(context: Context, info: SubscriptionInfo): RestoreResult {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -62,13 +66,38 @@ internal object CarrierIdentityAccess {
             it.name == "clearCarrierTestOverride" && it.parameterTypes.size == 1 &&
                 it.parameterTypes[0] == Int::class.javaPrimitiveType
         }
-        if (clear != null) {
-            invoke { clear.invoke(phone, info.subscriptionId) }
-            return RestoreResult(numeric)
-        }
+        val preferred = coordinator(context, info, key(info), original, phone) {
+            if (clear != null) invoke { clear.invoke(phone, info.subscriptionId) }
+            else set(phone, info.subscriptionId, numeric)
+        }.restore()
         // The fallback restores the reported code; a reboot/SIM reload exits test mode.
-        set(phone, info.subscriptionId, numeric, original.getString("name"))
-        return RestoreResult(numeric, fullyCleared = false)
+        return RestoreResult(numeric, fullyCleared = clear != null, apnChecked = true, preferredApnId = preferred)
+    }
+    fun verifyOriginalApns(context: Context, info: SubscriptionInfo, preferredApnId: Long?) {
+        val backup = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(key(info), null)
+            ?: error("原 SIM 備份已失效，無法核對 APN")
+        val original = JSONObject(backup)
+        val numeric = OperatorNumeric.parse(original.getString("numeric")).value
+        ApnOverrideAccess(context, info, key(info), numeric, null, {}, {}, { false })
+            .verify(numeric, emptySet(), preferredApnId)
+    }
+    private fun coordinator(
+        context: Context, info: SubscriptionInfo, key: String, original: JSONObject, phone: Any,
+        restore: (() -> Unit)? = null,
+    ): ApnOverrideCoordinator {
+        val numeric = OperatorNumeric.parse(original.getString("numeric")).value
+        val backend = ApnOverrideAccess(context, info, key, numeric,
+            original.takeIf { it.has("carrier_id") }?.getInt("carrier_id"),
+            restore ?: { set(phone, info.subscriptionId, numeric) },
+            { set(phone, info.subscriptionId, it) },
+            {
+                // Use the framework's ICCID matcher, exactly as the APN Provider does.
+                invoke { phone.javaClass.getMethod("isMvnoMatched", Int::class.javaPrimitiveType,
+                    Int::class.javaPrimitiveType, String::class.java)
+                    .invoke(phone, info.simSlotIndex, 3 /* MVNO_TYPE_ICCID */, info.iccId) as Boolean }
+            },
+        )
+        return ApnOverrideCoordinator(backend, numeric, info.iccId, info.subscriptionId)
     }
     fun completeRestore(context: Context, info: SubscriptionInfo, result: RestoreResult) {
         if (result.expectedNumeric != null && result.fullyCleared) {

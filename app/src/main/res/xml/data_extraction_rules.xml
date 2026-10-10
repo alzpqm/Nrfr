@@ -2,8 +2,10 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="carrier_identity_originals.xml"/>
+        <exclude domain="sharedpref" path="apn_override_recovery.xml"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="carrier_identity_originals.xml"/>
+        <exclude domain="sharedpref" path="apn_override_recovery.xml"/>
     </device-transfer>
 </data-extraction-rules>

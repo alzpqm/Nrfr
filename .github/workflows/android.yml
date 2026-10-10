@@ -47,7 +47,7 @@ jobs:
           import glob, os, pathlib, xml.etree.ElementTree as ET
           reports = [ET.parse(p).getroot() for p in glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml")]
           counts = {key: sum(int(r.attrib.get(key, 0)) for r in reports) for key in ("tests", "failures", "errors", "skipped")}
-          assert counts["tests"] >= 26 and counts["failures"] == counts["errors"] == counts["skipped"] == 0, counts
+          assert counts["tests"] >= 50 and counts["failures"] == counts["errors"] == counts["skipped"] == 0, counts
           with pathlib.Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
               summary.write(f"Android unit tests: {counts['tests']} passed. Lint and debug/release builds completed.\n")
           PY

@@ -12,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object CarrierConfigManager {
-    data class OperationResult(val persistent: Boolean, val requiresRestart: Boolean = false)
+    data class OperationResult(val persistent: Boolean, val requiresRestart: Boolean = false, val apnChecked: Boolean = false)
     suspend fun getSimCards(context: Context): List<SimCardInfo> {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return withContext(Dispatchers.IO) {
             CarrierConfigAccess.readSubscriptionsAsShell()
@@ -73,6 +73,7 @@ object CarrierConfigManager {
         val result = PrivilegedCarrierConfigRunner.run(context,
             PrivilegedCarrierConfigRunner.Request.Override(subId, bundle?.let { PersistableBundle(it) }, operatorNumeric))
         return OperationResult(result.getBoolean(PrivilegedCarrierConfigRunner.RESULT_PERSISTENT),
-            result.getBoolean(PrivilegedCarrierConfigRunner.RESULT_REQUIRES_RESTART))
+            result.getBoolean(PrivilegedCarrierConfigRunner.RESULT_REQUIRES_RESTART),
+            result.getBoolean(PrivilegedCarrierConfigRunner.RESULT_APN_CHECKED))
     }
 }

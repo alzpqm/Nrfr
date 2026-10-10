@@ -213,6 +213,8 @@ fun MainScreen(onShowAbout: () -> Unit) {
                 )
                 Text("只修改 SIM 讀取代碼。連線網路／基地台 MCC／MNC 未修改；其他 App 若使用網路資料，仍會顯示實際代碼。",
                     style = MaterialTheme.typography.bodySmall)
+                Text("套用時會保留原 SIM 的 APN，並核對清單與選取值；相容 APN 只匹配所選 SIM，還原時會清理。",
+                    style = MaterialTheme.typography.bodySmall)
             }
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -234,7 +236,8 @@ fun MainScreen(onShowAbout: () -> Unit) {
                         try {
                             val result = CarrierConfigManager.resetCarrierConfig(context, simCard.subId)
                             val message = if (result.requiresRestart) "原本的電信代碼已回復；請重啟手機，完整結束系統的測試覆寫狀態" else if (result.persistent) "設定已還原" else "暫時覆寫已清除，請確認重新啟動後的設定"
-                            editor = SimEditorState(subId = simCard.subId, operationMessage = "SIM ${simCard.slot}：$message")
+                            val apnMessage = if (result.apnChecked) "\n原 SIM 的 APN 清單與選取值已回讀確認。" else ""
+                            editor = SimEditorState(subId = simCard.subId, operationMessage = "SIM ${simCard.slot}：$message$apnMessage")
                             Toast.makeText(context, "SIM ${simCard.slot}：$message", Toast.LENGTH_LONG).show()
                         } catch (error: CancellationException) {
                             throw error
@@ -271,6 +274,7 @@ fun MainScreen(onShowAbout: () -> Unit) {
                                     append("\nSIM 電信業者代碼：$it")
                                     append("\n連線網路／基地台 MCC／MNC 未修改。")
                                 }
+                                if (result.apnChecked) append("\n原 SIM 的 APN 清單與選取值已保留並回讀確認。")
                                 append(if (result.persistent) "\n設定已儲存。" else "\n重新啟動、更換 SIM 或系統重載後可能需要重新套用。")
                             }
                             editor = editor.copy(operationMessage = message)

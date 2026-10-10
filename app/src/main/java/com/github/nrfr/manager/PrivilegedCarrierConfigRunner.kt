@@ -31,7 +31,8 @@ internal object PrivilegedCarrierConfigRunner {
     const val RESULT_PERSISTENT = "persistent"
     const val RESULT_SIM_CARDS = "sim_cards"
     const val RESULT_REQUIRES_RESTART = "requires_restart"
-    private const val TIMEOUT_MS = 15_000L
+    const val RESULT_APN_CHECKED = "apn_checked"
+    private const val TIMEOUT_MS = 30_000L
     private const val INSTR_FLAG_NO_RESTART = 8
 
     sealed interface Request {
