@@ -17,7 +17,9 @@ override and also after recycling the data connection while the APN list was
 empty. Therefore the OnePlus test reproduced APN hiding, but did **not**
 reproduce a mobile-data failure. It does not establish the S25 failure cause.
 
-The candidate refuses an MCC/MNC override when the current APN list cannot be
+The candidate uses a read-only APN type projection permitted by the provider's
+legacy read policy; newer provider policy may still deny it. It refuses an
+MCC/MNC override when the current APN list cannot be
 read, is empty, or the target numeric has no raw APN rows. If the post-change
 visible or filtered list becomes empty, it reapplies the previous SIM numeric
 and name and checks that the APN list returns. APN provider permission denial

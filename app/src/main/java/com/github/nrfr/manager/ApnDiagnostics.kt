@@ -14,7 +14,8 @@ internal object ApnDiagnostics {
     private fun requiredCount(context: Context, uri: String, selection: String? = null,
         args: Array<String>? = null): Int {
         try {
-            val cursor = context.contentResolver.query(Uri.parse(uri), arrayOf("_id"),
+            // TYPE is allowed by the provider's legacy read policy; newer policies may still deny it.
+            val cursor = context.contentResolver.query(Uri.parse(uri), arrayOf("type"),
                 selection, args, null) ?: error("APN 查詢未回傳資料；代碼尚未確認可安全修改")
             return cursor.use { it.count }
         } catch (_: SecurityException) {
@@ -38,7 +39,7 @@ internal object ApnDiagnostics {
     private fun count(context: Context, uri: String, selection: String? = null,
         args: Array<String>? = null): String {
         return try {
-            val cursor: Cursor = context.contentResolver.query(Uri.parse(uri), arrayOf("_id"),
+            val cursor: Cursor = context.contentResolver.query(Uri.parse(uri), arrayOf("type"),
                 selection, args, null) ?: return "null_cursor"
             cursor.use { it.count.toString() }
         } catch (_: SecurityException) {

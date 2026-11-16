@@ -47,7 +47,6 @@ class CarrierConfigInstrumentation : Instrumentation() {
             )
             if (request is PrivilegedCarrierConfigRunner.Request.Override) {
                 permissions += Manifest.permission.MODIFY_PHONE_STATE
-                if (request.operatorNumeric != null) permissions += Manifest.permission.WRITE_APN_SETTINGS
             }
             manager.startDelegateShellPermissionIdentity(Process.myUid(), permissions.toTypedArray())
             delegated = true
@@ -72,15 +71,13 @@ class CarrierConfigInstrumentation : Instrumentation() {
                     }
                     result.putParcelableArrayList(PrivilegedCarrierConfigRunner.RESULT_SIM_CARDS, ArrayList(cards))
                     // Candidate diagnosis only: a permission denial is never an empty APN list.
-                    try {
-                        checkNotNull(manager).startDelegateShellPermissionIdentity(Process.myUid(),
-                            (permissions + Manifest.permission.WRITE_APN_SETTINGS).toTypedArray())
-                        subscriptions.forEach { info ->
+                    subscriptions.forEach { info ->
+                        try {
                             Log.i("NrfrApnDiag", "slot=${info.simSlotIndex + 1} " +
                                 ApnDiagnostics.summary(targetContext, info))
+                        } catch (_: Exception) {
+                            Log.i("NrfrApnDiag", "slot=${info.simSlotIndex + 1} diagnosis_failed")
                         }
-                    } catch (_: Exception) {
-                        Log.i("NrfrApnDiag", "delegation_or_diagnosis_failed")
                     }
                 }
                 is PrivilegedCarrierConfigRunner.Request.Override -> {
