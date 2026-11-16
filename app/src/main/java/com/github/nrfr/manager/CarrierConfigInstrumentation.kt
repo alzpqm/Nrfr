@@ -151,13 +151,16 @@ class CarrierConfigInstrumentation : Instrumentation() {
                             rollbackIdentity = {
                                 if (previous != null && previous.numeric != requestedNumeric) {
                                     CarrierIdentityAccess.reapplyPrevious(targetContext, info, previous)
-                                    var restoredApns = false
-                                    repeat(6) {
-                                        if (ApnDiagnostics.visibleForSubscription(targetContext,
-                                                info.subscriptionId) > 0) restoredApns = true
-                                        if (!restoredApns) Thread.sleep(1_000)
+                                    var stableApns = 0
+                                    repeat(6) { attempt ->
+                                        val visible = ApnDiagnostics.visibleForSubscription(targetContext,
+                                            info.subscriptionId)
+                                        val filtered = ApnDiagnostics.filteredForSubscription(targetContext,
+                                            info.subscriptionId)
+                                        stableApns = if (visible > 0 && filtered > 0) stableApns + 1 else 0
+                                        if (attempt < 5) Thread.sleep(1_000)
                                     }
-                                    check(restoredApns) { "原 APN 清單尚未恢復" }
+                                    check(stableApns >= 3) { "原 APN 清單尚未穩定恢復" }
                                 }
                             },
                         ).apply(request.operatorNumeric, !request.values.isEmpty)
