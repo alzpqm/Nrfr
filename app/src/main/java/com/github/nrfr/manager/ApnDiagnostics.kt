@@ -6,8 +6,10 @@ import android.net.Uri
 import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
+import androidx.annotation.RequiresApi
 
 /** Read-only counts. Never log APN values, row IDs, SIM identifiers, or provider exceptions. */
+@RequiresApi(29)
 internal object ApnDiagnostics {
     private fun count(context: Context, uri: String, selection: String? = null,
         args: Array<String>? = null): String {
