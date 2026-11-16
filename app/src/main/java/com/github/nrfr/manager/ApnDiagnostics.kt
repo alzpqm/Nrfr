@@ -11,6 +11,30 @@ import androidx.annotation.RequiresApi
 /** Read-only counts. Never log APN values, row IDs, SIM identifiers, or provider exceptions. */
 @RequiresApi(29)
 internal object ApnDiagnostics {
+    private fun requiredCount(context: Context, uri: String, selection: String? = null,
+        args: Array<String>? = null): Int {
+        try {
+            val cursor = context.contentResolver.query(Uri.parse(uri), arrayOf("_id"),
+                selection, args, null) ?: error("APN 查詢未回傳資料；代碼尚未確認可安全修改")
+            return cursor.use { it.count }
+        } catch (_: SecurityException) {
+            error("APN 讀取權限遭拒；代碼尚未確認可安全修改")
+        } catch (_: IllegalArgumentException) {
+            error("系統不支援 APN 安全查詢；代碼尚未確認可安全修改")
+        } catch (_: Exception) {
+            error("APN 查詢失敗；代碼尚未確認可安全修改")
+        }
+    }
+
+    fun rawForNumeric(context: Context, numeric: String): Int =
+        requiredCount(context, "content://telephony/carriers", "numeric = ?", arrayOf(numeric))
+
+    fun visibleForSubscription(context: Context, subId: Int): Int =
+        requiredCount(context, "content://telephony/carriers/sim_apn_list/$subId")
+
+    fun filteredForSubscription(context: Context, subId: Int): Int =
+        requiredCount(context, "content://telephony/carriers/sim_apn_list/filtered/subId/$subId")
+
     private fun count(context: Context, uri: String, selection: String? = null,
         args: Array<String>? = null): String {
         return try {

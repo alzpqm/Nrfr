@@ -20,6 +20,21 @@ import org.json.JSONObject
 internal object CarrierIdentityAccess {
     private const val PREFS = "carrier_identity_originals"
 
+    data class Previous(val numeric: String, val spn: String?)
+
+    fun previous(context: Context, info: SubscriptionInfo): Previous {
+        val telephony = context.getSystemService(TelephonyManager::class.java)
+            .createForSubscriptionId(info.subscriptionId)
+        return Previous(OperatorNumeric.parse(telephony.simOperator.orEmpty()).value,
+            telephony.simOperatorName)
+    }
+
+    fun reapplyPrevious(context: Context, info: SubscriptionInfo, previous: Previous) {
+        assertPresent(context, info)
+        set(service(), info.subscriptionId, previous.numeric, previous.spn)
+        verify(context, info, previous.numeric)
+    }
+
     private fun service(): Any {
         val binder = ServiceManager.getService(Context.TELEPHONY_SERVICE) ?: error("電話服務無法使用")
         return Class.forName("com.android.internal.telephony.ITelephony\$Stub")
