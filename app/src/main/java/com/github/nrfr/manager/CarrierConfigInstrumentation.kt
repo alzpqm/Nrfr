@@ -47,6 +47,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
             )
             if (request is PrivilegedCarrierConfigRunner.Request.Override) {
                 permissions += Manifest.permission.MODIFY_PHONE_STATE
+                if (request.operatorNumeric != null) permissions += Manifest.permission.WRITE_APN_SETTINGS
             }
             manager.startDelegateShellPermissionIdentity(Process.myUid(), permissions.toTypedArray())
             delegated = true
@@ -118,36 +119,17 @@ class CarrierConfigInstrumentation : Instrumentation() {
                         }
                         val persistent = CarrierApplyCoordinator(
                             applyIdentity = {
-                                try {
-                                    CarrierIdentityAccess.apply(targetContext, info, it,
-                                        request.values.getString(CarrierConfigAccess.CARRIER_NAME))
-                                    CarrierIdentityAccess.verify(targetContext, info, it)
-                                    if (previous != null && previous.numeric != it) {
-                                        // The provider can reload asynchronously after the SIM property changes.
-                                        repeat(6) {
-                                            Thread.sleep(1_000)
-                                            ApnSafetyGate.afterApply(
-                                                ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
-                                                ApnDiagnostics.filteredForSubscription(targetContext, info.subscriptionId))
-                                        }
+                                CarrierIdentityAccess.apply(targetContext, info, it,
+                                    request.values.getString(CarrierConfigAccess.CARRIER_NAME))
+                                CarrierIdentityAccess.verify(targetContext, info, it)
+                                if (previous != null && previous.numeric != it) {
+                                    // The provider can reload asynchronously after the SIM property changes.
+                                    repeat(6) {
+                                        Thread.sleep(1_000)
+                                        ApnSafetyGate.afterApply(
+                                            ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
+                                            ApnDiagnostics.filteredForSubscription(targetContext, info.subscriptionId))
                                     }
-                                } catch (error: Exception) {
-                                    if (previous != null && previous.numeric != it) {
-                                        try {
-                                            CarrierIdentityAccess.reapplyPrevious(targetContext, info, previous)
-                                            var restoredApns = false
-                                            repeat(6) {
-                                                if (ApnDiagnostics.visibleForSubscription(targetContext,
-                                                        info.subscriptionId) > 0) restoredApns = true
-                                                if (!restoredApns) Thread.sleep(1_000)
-                                            }
-                                            check(restoredApns) { "原 APN 清單尚未恢復" }
-                                        } catch (rollback: Exception) {
-                                            error.addSuppressed(rollback)
-                                            throw IllegalStateException("代碼操作失敗，且自動還原尚未確認；請執行還原設定並核對 APN", error)
-                                        }
-                                    }
-                                    throw error
                                 }
                             },
                             applyConfig = {
@@ -155,7 +137,29 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                     CarrierConfigAccess.override(request.subId, request.values, it, asShell = false)
                                 }
                             },
-                            verify = { verifyConfig(request.subId, request.values, it) },
+                            verify = {
+                                verifyConfig(request.subId, request.values, it)
+                                if (previous != null && previous.numeric != it) {
+                                    repeat(3) {
+                                        Thread.sleep(1_000)
+                                        ApnSafetyGate.afterApply(
+                                            ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
+                                            ApnDiagnostics.filteredForSubscription(targetContext, info.subscriptionId))
+                                    }
+                                }
+                            },
+                            rollbackIdentity = {
+                                if (previous != null && previous.numeric != requestedNumeric) {
+                                    CarrierIdentityAccess.reapplyPrevious(targetContext, info, previous)
+                                    var restoredApns = false
+                                    repeat(6) {
+                                        if (ApnDiagnostics.visibleForSubscription(targetContext,
+                                                info.subscriptionId) > 0) restoredApns = true
+                                        if (!restoredApns) Thread.sleep(1_000)
+                                    }
+                                    check(restoredApns) { "原 APN 清單尚未恢復" }
+                                }
+                            },
                         ).apply(request.operatorNumeric, !request.values.isEmpty)
                         result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_PERSISTENT, persistent)
                     }
