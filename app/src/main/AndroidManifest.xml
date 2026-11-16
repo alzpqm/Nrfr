@@ -35,7 +35,7 @@
     </application>
 
     <instrumentation
-            android:name=".manager.CarrierConfigInstrumentation"
+            android:name="com.github.nrfr.manager.CarrierConfigInstrumentation"
             android:targetPackage="${applicationId}"/>
 
 </manifest>

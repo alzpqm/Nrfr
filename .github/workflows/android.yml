@@ -72,4 +72,3 @@ jobs:
         with:
           name: nrfr-s25-sidecar-unsigned
           path: app/build/outputs/apk/s25Diagnostic/app-s25Diagnostic-unsigned.apk
-
