@@ -70,6 +70,17 @@ class CarrierConfigInstrumentation : Instrumentation() {
                         }
                     }
                     result.putParcelableArrayList(PrivilegedCarrierConfigRunner.RESULT_SIM_CARDS, ArrayList(cards))
+                    // Candidate diagnosis only: a permission denial is never an empty APN list.
+                    try {
+                        checkNotNull(manager).startDelegateShellPermissionIdentity(Process.myUid(),
+                            (permissions + Manifest.permission.WRITE_APN_SETTINGS).toTypedArray())
+                        subscriptions.forEach { info ->
+                            Log.i("NrfrApnDiag", "slot=${info.simSlotIndex + 1} " +
+                                ApnDiagnostics.summary(targetContext, info))
+                        }
+                    } catch (_: Exception) {
+                        Log.i("NrfrApnDiag", "delegation_or_diagnosis_failed")
+                    }
                 }
                 is PrivilegedCarrierConfigRunner.Request.Override -> {
                     val info = subscriptions.firstOrNull { it.subscriptionId == request.subId }

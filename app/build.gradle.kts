@@ -14,8 +14,8 @@ android {
         applicationId = "com.github.nrfr"
         minSdk = 26
         targetSdk = 37
-        versionCode = 11 // 每次發布遞增
-        versionName = "1.1.4"
+        versionCode = 12 // Signed diagnostic candidate; no public release
+        versionName = "1.1.5-rc1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
