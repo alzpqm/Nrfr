@@ -75,3 +75,14 @@ repository CI, so no replacement-signed APK may replace an installed copy.
 
 Raw device output, SIM identifiers, network values, and UI captures are kept
 outside Git in the local private diagnostics directory.
+
+## Side-by-side test after original key loss
+
+The original 1.1.4 signing key has been reported lost. A newly signed APK with
+the original `com.github.nrfr` package ID cannot update that installed app.
+The `s25Diagnostic` build therefore uses `com.github.nrfr.s25`, has separate
+app data, and can be installed beside 1.1.4 without removing it. Its signing
+key is local private material outside Git. This build is a diagnostic path,
+not an update for existing Nrfr installations or evidence that the APN fault
+is fixed. Device validation and any publication decision depend on its actual
+S25 results.

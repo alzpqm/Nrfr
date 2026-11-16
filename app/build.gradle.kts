@@ -26,6 +26,12 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+        create("s25Diagnostic") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".s25"
+            versionNameSuffix = "-s25"
+            matchingFallbacks += listOf("release")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

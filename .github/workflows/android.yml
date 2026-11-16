@@ -39,7 +39,7 @@ jobs:
           cmdline-tools-version: '16111833'
       - run: sdkmanager 'platforms;android-37.2' 'build-tools;37.0.0'
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease
+      - run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease :app:assembleS25Diagnostic
       - name: Summarize unit tests
         shell: bash
         run: |
@@ -68,48 +68,8 @@ jobs:
         with:
           name: nrfr-android-release-unsigned
           path: app/build/outputs/apk/release/app-release-unsigned.apk
-
-  signed-diagnostic-candidate:
-    needs: android
-    if: github.repository == 'alzpqm/Nrfr' && github.ref == 'refs/heads/codex/s25-apn-fix'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: '16111833'
-      - run: sdkmanager 'build-tools;37.0.0'
-      - uses: actions/download-artifact@v4
-        with:
-          name: nrfr-android-release-unsigned
-          path: apk
-      - name: Sign with the existing release certificate
-        shell: bash
-        env:
-          NRFR_RELEASE_KEYSTORE_BASE64: ${{ secrets.NRFR_RELEASE_KEYSTORE_BASE64 }}
-          NRFR_RELEASE_STORE_PASSWORD: ${{ secrets.NRFR_RELEASE_STORE_PASSWORD }}
-          NRFR_RELEASE_KEY_PASSWORD: ${{ secrets.NRFR_RELEASE_KEY_PASSWORD }}
-        run: |
-          test -n "$NRFR_RELEASE_KEYSTORE_BASE64" && test -n "$NRFR_RELEASE_STORE_PASSWORD" && test -n "$NRFR_RELEASE_KEY_PASSWORD" || {
-            echo 'Existing release key is unavailable; no substitute will be generated.'
-            exit 1
-          }
-          umask 077
-          signing_dir=$(mktemp -d "$RUNNER_TEMP/nrfr-candidate.XXXXXX")
-          trap 'rm -rf "$signing_dir"' EXIT
-          printf '%s' "$NRFR_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$signing_dir/nrfr-release.p12"
-          "$ANDROID_HOME/build-tools/37.0.0/zipalign" -P 16 -f 4 apk/app-release-unsigned.apk "$signing_dir/aligned.apk"
-          "$ANDROID_HOME/build-tools/37.0.0/apksigner" sign \
-            --ks "$signing_dir/nrfr-release.p12" --ks-key-alias nrfr-release \
-            --ks-pass env:NRFR_RELEASE_STORE_PASSWORD --key-pass env:NRFR_RELEASE_KEY_PASSWORD \
-            --v4-signing-enabled false --out nrfr-s25-diagnostic.apk "$signing_dir/aligned.apk"
-          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs nrfr-s25-diagnostic.apk |
-            grep -i '64f5cde8ff7b2e5a1496941249c9c0c355744936fb6b11f19bbc65ac3830e469'
       - uses: actions/upload-artifact@v4
         with:
-          name: nrfr-s25-signed-diagnostic-candidate
-          path: nrfr-s25-diagnostic.apk
-          retention-days: 2
+          name: nrfr-s25-sidecar-unsigned
+          path: app/build/outputs/apk/s25Diagnostic/app-s25Diagnostic-unsigned.apk
+
