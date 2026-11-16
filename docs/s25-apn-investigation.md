@@ -22,10 +22,10 @@ change and treats permission denial or query failure as an error, never an
 empty list. The first version checked raw, SIM-visible, and filtered counts
 and rolled back when those became empty. S25 testing showed these checks were
 too broad: Samsung APN Settings applies an additional slot-specific `current`
-filter. The current candidate also updates that flag through Samsung's
+filter. The next candidate updates that flag through Samsung's
 per-subscription current-operator provider operation and checks the same
-filtered view that Settings queries. This later change is **unverified** on
-the device. No APN rows are copied.
+filtered view that Settings queries. The S25 test below proves this update
+is temporary, so this branch is **not safe to release**. No APN rows are copied.
 
 ## S25 follow-up on the installed 1.1.4
 
@@ -84,13 +84,35 @@ Samsung APN Settings displayed no APN choices and reported the settings
 unavailable. This was a false success. The original SIM numeric was restored;
 both SIM subscription identities and APN screens matched the baseline again.
 The original 1.1.4 package remains installed. No APN reset, data clear, or row
-copy was used. The APN editor save transaction and cellular data path remain
-unverified.
+copy was used in that test.
 
 Disassembly of this S25's installed Samsung Settings shows its APN screen
 queries `SIM_APN_URI` with `current = 1` on slot 1 and `current1 = 1` on slot 2.
 The installed Samsung TelephonyProvider exposes a per-subscription current
-operator operation that updates the corresponding flag. The new candidate
-uses this operation and checks that the other SIM's APN count stays unchanged.
-It still needs real S25 validation, including APN display, edit/save, selected
-APN, rollback, both SIMs, and cellular-bound DNS/HTTPS with Wi-Fi excluded.
+operator operation that updates the corresponding flag. Candidate `c1c89d6`
+uses this operation and compares the other SIM's current-row IDs in memory.
+CI passed on this commit, and the signed sidecar was installed over the earlier
+sidecar without removing 1.1.4.
+
+With SIM 1 selected and **Modify SIM operator numeric checked**, the target
+MNC changed while MCC and SIM 2 numeric stayed original. Samsung APN Settings
+then showed one selectable target APN but none selected. SIM 2 still showed
+one selected APN. A distinct temporary APN was created and saved in Settings;
+it appeared in the modified SIM's list. Deleting that temporary APN was logged
+as successful by TelephonyProvider. Immediately afterwards, TelephonyProvider
+inserted the original operator numeric as current again, and Samsung APN
+Settings logged zero matching APNs. A fresh screenshot confirmed the empty
+screen. The APN list had therefore only been repaired temporarily by the
+candidate's one-time current-operator update. The original APN rows were not
+shown to be deleted.
+
+The sidecar's full Restore action returned SIM 1 to its original numeric
+**without reboot**. A fresh APN screen showed two choices with one selected;
+SIM 2 showed one choice with one selected; the temporary APN was absent. Both
+SIM numerics matched the original values. The restore UI requested a reboot
+for a separate nonpersistent CarrierConfig clear, but no reboot was needed to
+recover the observed SIM numeric and APN screens. Cellular-bound DNS/HTTPS and
+an APN selection under the modified MNC were not verified. Earlier cellular
+DNS/HTTPS failures predated this candidate, so mobile-data repair cannot be
+claimed. The original 1.1.4 and the sidecar remain installed. No public release
+has been made.
