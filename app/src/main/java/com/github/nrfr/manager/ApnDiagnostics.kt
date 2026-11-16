@@ -36,6 +36,17 @@ internal object ApnDiagnostics {
     fun filteredForSubscription(context: Context, subId: Int): Int =
         requiredCount(context, "content://telephony/carriers/sim_apn_list/filtered/subId/$subId")
 
+    /** Samsung APN Settings adds a slot-specific current flag to SIM_APN_URI. */
+    fun settingsVisibleForSubscription(context: Context, info: SubscriptionInfo): Int {
+        val flag = when (info.simSlotIndex) {
+            0 -> "current"
+            1 -> "current1"
+            else -> error("無法確認此 SIM 卡槽的 APN 篩選條件")
+        }
+        return requiredCount(context, "content://telephony/carriers/sim_apn_list/${info.subscriptionId}",
+            "NOT (type='ia' AND (apn=\"\" OR apn IS NULL)) AND $flag = 1")
+    }
+
     private fun count(context: Context, uri: String, selection: String? = null,
         args: Array<String>? = null): String {
         return try {

@@ -47,7 +47,10 @@ class CarrierConfigInstrumentation : Instrumentation() {
             )
             if (request is PrivilegedCarrierConfigRunner.Request.Override) {
                 permissions += Manifest.permission.MODIFY_PHONE_STATE
-                if (request.operatorNumeric != null) permissions += Manifest.permission.WRITE_APN_SETTINGS
+                if (request.operatorNumeric != null ||
+                    (request.values == null && SamsungApnCurrentOperator.isRequired())) {
+                    permissions += Manifest.permission.WRITE_APN_SETTINGS
+                }
             }
             manager.startDelegateShellPermissionIdentity(Process.myUid(), permissions.toTypedArray())
             delegated = true
@@ -95,6 +98,15 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                 }
                             },
                             verifyIdentity = { CarrierIdentityAccess.verify(targetContext, info, it) },
+                            restoreApnCurrent = { restored ->
+                                if (SamsungApnCurrentOperator.isRequired()) {
+                                    val original = checkNotNull(restored.expectedNumeric)
+                                    SamsungApnCurrentOperator.set(targetContext, info, original)
+                                    check(ApnDiagnostics.settingsVisibleForSubscription(targetContext, info) > 0) {
+                                        "原 APN 清單尚未恢復"
+                                    }
+                                }
+                            },
                             cleanupApns = { restored ->
                                 if (CarrierIdentityAccess.hasLegacyApns(targetContext, info)) {
                                     // Request APN permissions only after the identity is confirmed.
@@ -112,9 +124,14 @@ class CarrierConfigInstrumentation : Instrumentation() {
                     } else {
                         val requestedNumeric = request.operatorNumeric
                         val previous = requestedNumeric?.let { CarrierIdentityAccess.previous(targetContext, info) }
+                        val samsung = SamsungApnCurrentOperator.isRequired()
+                        val otherSim = subscriptions.firstOrNull { it.simSlotIndex != info.simSlotIndex }
+                        val otherSettingsCount = if (requestedNumeric != null && samsung && otherSim != null)
+                            ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) else null
                         if (requestedNumeric != null && previous != null && previous.numeric != requestedNumeric) {
                             ApnSafetyGate.preflight(
-                                ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
+                                if (samsung) ApnDiagnostics.settingsVisibleForSubscription(targetContext, info)
+                                else ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
                                 ApnDiagnostics.rawForNumeric(targetContext, requestedNumeric))
                         }
                         val persistent = CarrierApplyCoordinator(
@@ -123,12 +140,18 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                     request.values.getString(CarrierConfigAccess.CARRIER_NAME))
                                 CarrierIdentityAccess.verify(targetContext, info, it)
                                 if (previous != null && previous.numeric != it) {
+                                    if (samsung) SamsungApnCurrentOperator.set(targetContext, info, it)
                                     // The provider can reload asynchronously after the SIM property changes.
                                     repeat(6) {
                                         Thread.sleep(1_000)
                                         ApnSafetyGate.afterApply(
-                                            ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
+                                            if (samsung) ApnDiagnostics.settingsVisibleForSubscription(targetContext, info)
+                                            else ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
                                             ApnDiagnostics.filteredForSubscription(targetContext, info.subscriptionId))
+                                    }
+                                    if (otherSim != null && otherSettingsCount != null) check(
+                                        ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) == otherSettingsCount) {
+                                        "另一張 SIM 的 APN 清單已改變"
                                     }
                                 }
                             },
@@ -143,24 +166,38 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                     repeat(3) {
                                         Thread.sleep(1_000)
                                         ApnSafetyGate.afterApply(
-                                            ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
+                                            if (samsung) ApnDiagnostics.settingsVisibleForSubscription(targetContext, info)
+                                            else ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
                                             ApnDiagnostics.filteredForSubscription(targetContext, info.subscriptionId))
+                                    }
+                                    if (otherSim != null && otherSettingsCount != null) check(
+                                        ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) == otherSettingsCount) {
+                                        "另一張 SIM 的 APN 清單已改變"
                                     }
                                 }
                             },
                             rollbackIdentity = {
                                 if (previous != null && previous.numeric != requestedNumeric) {
-                                    CarrierIdentityAccess.reapplyPrevious(targetContext, info, previous)
+                                    try {
+                                        CarrierIdentityAccess.reapplyPrevious(targetContext, info, previous)
+                                    } finally {
+                                        if (samsung) SamsungApnCurrentOperator.set(targetContext, info, previous.numeric)
+                                    }
                                     var stableApns = 0
                                     repeat(6) { attempt ->
-                                        val visible = ApnDiagnostics.visibleForSubscription(targetContext,
-                                            info.subscriptionId)
+                                        val visible = if (samsung)
+                                            ApnDiagnostics.settingsVisibleForSubscription(targetContext, info)
+                                        else ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId)
                                         val filtered = ApnDiagnostics.filteredForSubscription(targetContext,
                                             info.subscriptionId)
                                         stableApns = if (visible > 0 && filtered > 0) stableApns + 1 else 0
                                         if (attempt < 5) Thread.sleep(1_000)
                                     }
                                     check(stableApns >= 3) { "原 APN 清單尚未穩定恢復" }
+                                    if (otherSim != null && otherSettingsCount != null) check(
+                                        ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) == otherSettingsCount) {
+                                        "另一張 SIM 的 APN 清單尚未恢復"
+                                    }
                                 }
                             },
                         ).apply(request.operatorNumeric, !request.values.isEmpty)

@@ -13,6 +13,7 @@ class CarrierRestoreCoordinatorTest {
         var config = true
         var apnsCleaned = false
         var apnFailure: Exception? = null
+        var currentFailure = false
         var identityFailure = false
         var configFailure = false
         var rejectNumeric = false
@@ -38,6 +39,9 @@ class CarrierRestoreCoordinatorTest {
             verifyIdentity = { expected ->
                 events += "verify"
                 check(numeric == expected)
+            },
+            restoreApnCurrent = {
+                if (currentFailure) throw SecurityException("private provider details")
             },
             cleanupApns = {
                 events += "apn"
@@ -86,6 +90,15 @@ class CarrierRestoreCoordinatorTest {
         val secret = "private APN credential and SIM identity"
         val report = Device().apply { apnFailure = IllegalArgumentException(secret) }.restore()
         assertFalse(report.warning!!.contains(secret))
+    }
+
+    @Test fun failedCurrentOperatorRecoveryRetainsBackupWithoutLeakingDetails() {
+        val device = Device().apply { currentFailure = true }
+        val report = device.restore()
+        assertEquals(original, report.restoredNumeric)
+        assertTrue(device.backup)
+        assertFalse(device.events.contains("apn"))
+        assertFalse(report.warning!!.contains("private provider details"))
     }
 
     @Test fun countryAndNameAreStillClearedWhenIdentityBinderFails() {

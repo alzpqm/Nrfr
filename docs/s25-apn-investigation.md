@@ -1,4 +1,4 @@
-# APN safety candidate (not a verified S25 repair)
+# APN safety investigation (not a verified S25 repair)
 
 The installed 1.1.4 app passes a null IMSI argument to `setCarrierTestOverride`.
 This investigation concerns the SIM operator numeric (MCC/MNC), not an IMSI change.
@@ -17,18 +17,15 @@ override and also after recycling the data connection while the APN list was
 empty. Therefore the OnePlus test reproduced APN hiding, but did **not**
 reproduce a mobile-data failure. It does not establish the S25 failure cause.
 
-The candidate uses a read-only APN type projection permitted by the provider's
-legacy read policy; newer provider policy may still deny it. It refuses an
-MCC/MNC override when the current APN list cannot be
-read, is empty, or the target numeric has no raw APN rows. If the post-change
-visible or filtered list becomes empty, it reapplies the previous SIM numeric
-and name and checks that the APN list returns. APN provider permission denial
-or query failure is an error, never an empty-list result. MCC/MNC modification
-remains available for targets with APN rows, subject to the post-change check.
-The candidate requests Nightzuku's existing shell APN permission only for an
-identity-change operation, and uses it for read-only checks. It checks again
-after the CarrierConfig write; a config or verification failure also triggers
-identity rollback. The delegated read path has not been run on S25.
+The candidate uses Nightzuku's existing shell APN permission for an identity
+change and treats permission denial or query failure as an error, never an
+empty list. The first version checked raw, SIM-visible, and filtered counts
+and rolled back when those became empty. S25 testing showed these checks were
+too broad: Samsung APN Settings applies an additional slot-specific `current`
+filter. The current candidate also updates that flag through Samsung's
+per-subscription current-operator provider operation and checks the same
+filtered view that Settings queries. This later change is **unverified** on
+the device. No APN rows are copied.
 
 ## S25 follow-up on the installed 1.1.4
 
@@ -67,11 +64,9 @@ that the MNC test caused or repaired mobile-data loss. The modem data call was
 connected with no reported setup failure, so the remaining cause needs a
 separate cellular-network investigation.
 
-The candidate has not been installed or validated on S25. Its APN preflight
-will fail closed on this device while the provider denies read access, so the
-MNC change remains unavailable there until a safe read or verified APN handling
-path exists. Existing release-signing credentials are unavailable in the
-repository CI, so no replacement-signed APK may replace an installed copy.
+The first sidecar candidate was installed on S25 and read the APN provider
+using delegated permission. Rootless shell reads still failed. The diagnostic
+candidate has a new signature and cannot update the original package.
 
 Raw device output, SIM identifiers, network values, and UI captures are kept
 outside Git in the local private diagnostics directory.
@@ -82,7 +77,20 @@ The original 1.1.4 signing key has been reported lost. A newly signed APK with
 the original `com.github.nrfr` package ID cannot update that installed app.
 The `s25Diagnostic` build therefore uses `com.github.nrfr.s25`, has separate
 app data, and can be installed beside 1.1.4 without removing it. Its signing
-key is local private material outside Git. This build is a diagnostic path,
-not an update for existing Nrfr installations or evidence that the APN fault
-is fixed. Device validation and any publication decision depend on its actual
-S25 results.
+key is local private material outside Git. Its first test with a target MNC
+having no raw rows was correctly rejected before the SIM identity changed.
+A second target had raw rows and passed the first candidate's APN checks, yet
+Samsung APN Settings displayed no APN choices and reported the settings
+unavailable. This was a false success. The original SIM numeric was restored;
+both SIM subscription identities and APN screens matched the baseline again.
+The original 1.1.4 package remains installed. No APN reset, data clear, or row
+copy was used. The APN editor save transaction and cellular data path remain
+unverified.
+
+Disassembly of this S25's installed Samsung Settings shows its APN screen
+queries `SIM_APN_URI` with `current = 1` on slot 1 and `current1 = 1` on slot 2.
+The installed Samsung TelephonyProvider exposes a per-subscription current
+operator operation that updates the corresponding flag. The new candidate
+uses this operation and checks that the other SIM's APN count stays unchanged.
+It still needs real S25 validation, including APN display, edit/save, selected
+APN, rollback, both SIMs, and cellular-bound DNS/HTTPS with Wi-Fi excluded.
