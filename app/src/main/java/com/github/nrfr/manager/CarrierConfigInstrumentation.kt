@@ -126,9 +126,16 @@ class CarrierConfigInstrumentation : Instrumentation() {
                         val previous = requestedNumeric?.let { CarrierIdentityAccess.previous(targetContext, info) }
                         val samsung = SamsungApnCurrentOperator.isRequired()
                         val otherSim = subscriptions.firstOrNull { it.simSlotIndex != info.simSlotIndex }
+                        val originalCurrentRows = if (requestedNumeric != null && samsung)
+                            ApnDiagnostics.currentFlagRows(targetContext, info) else null
+                        val otherCurrentRows = if (requestedNumeric != null && samsung && otherSim != null)
+                            ApnDiagnostics.currentFlagRows(targetContext, otherSim) else null
                         val otherSettingsCount = if (requestedNumeric != null && samsung && otherSim != null)
                             ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) else null
                         if (requestedNumeric != null && previous != null && previous.numeric != requestedNumeric) {
+                            if (samsung) check(!originalCurrentRows.isNullOrEmpty()) {
+                                "目前 SIM 的 APN 電信業者狀態無法確認；代碼尚未修改"
+                            }
                             ApnSafetyGate.preflight(
                                 if (samsung) ApnDiagnostics.settingsVisibleForSubscription(targetContext, info)
                                 else ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
@@ -153,6 +160,10 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                         ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) == otherSettingsCount) {
                                         "另一張 SIM 的 APN 清單已改變"
                                     }
+                                    if (otherSim != null && otherCurrentRows != null) check(
+                                        ApnDiagnostics.currentFlagRows(targetContext, otherSim) == otherCurrentRows) {
+                                        "另一張 SIM 的 APN 電信業者狀態已改變"
+                                    }
                                 }
                             },
                             applyConfig = {
@@ -174,6 +185,10 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                         ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) == otherSettingsCount) {
                                         "另一張 SIM 的 APN 清單已改變"
                                     }
+                                    if (otherSim != null && otherCurrentRows != null) check(
+                                        ApnDiagnostics.currentFlagRows(targetContext, otherSim) == otherCurrentRows) {
+                                        "另一張 SIM 的 APN 電信業者狀態已改變"
+                                    }
                                 }
                             },
                             rollbackIdentity = {
@@ -194,9 +209,17 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                         if (attempt < 5) Thread.sleep(1_000)
                                     }
                                     check(stableApns >= 3) { "原 APN 清單尚未穩定恢復" }
+                                    if (originalCurrentRows != null) check(
+                                        ApnDiagnostics.currentFlagRows(targetContext, info) == originalCurrentRows) {
+                                        "原 APN 電信業者狀態尚未恢復"
+                                    }
                                     if (otherSim != null && otherSettingsCount != null) check(
                                         ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) == otherSettingsCount) {
                                         "另一張 SIM 的 APN 清單尚未恢復"
+                                    }
+                                    if (otherSim != null && otherCurrentRows != null) check(
+                                        ApnDiagnostics.currentFlagRows(targetContext, otherSim) == otherCurrentRows) {
+                                        "另一張 SIM 的 APN 電信業者狀態尚未恢復"
                                     }
                                 }
                             },
