@@ -16,6 +16,11 @@ import java.security.MessageDigest
 internal object SamsungApnCarrierBinding {
     private const val PREFS = "samsung_apn_carrier_binding"
     private const val ROOT = "content://telephony/carriers"
+    // Verified against this Samsung provider's CARRIERS_UNIQUE_FIELDS_DEFAULTS.
+    private val uniqueColumns = listOf("numeric", "mcc", "mnc", "apn", "proxy", "port", "mmsproxy",
+        "mmsport", "mmsc", "carrier_enabled", "bearer", "mvno_type", "mvno_match_data", "profile_id",
+        "protocol", "roaming_protocol", "user_editable", "owned_by", "apn_set_id", "carrier_id",
+        "infrastructure_bitmask", "esim_bootstrap_provisioning")
     private data class Row(val id: Long, val carrier: Int, val edited: Int, val otherCurrent: Int)
 
     private fun key(info: SubscriptionInfo): String = MessageDigest.getInstance("SHA-256")
@@ -35,6 +40,33 @@ internal object SamsungApnCarrierBinding {
     private fun settingsIds(context: Context, info: SubscriptionInfo): Set<Long> =
         ids(context, "$ROOT/sim_apn_list/${info.subscriptionId}",
             "NOT (type='ia' AND (apn=\"\" OR apn IS NULL)) AND ${if (info.simSlotIndex == 0) "current" else "current1"} = 1")
+
+    fun filteredIds(context: Context, info: SubscriptionInfo): Set<Long> =
+        ids(context, "$ROOT/sim_apn_list/filtered/subId/${info.subscriptionId}")
+
+    fun preferredIds(context: Context, info: SubscriptionInfo): Set<Long> =
+        ids(context, "$ROOT/preferapn/subId/${info.subscriptionId}")
+
+    private fun checkNoConflict(context: Context, id: Long, destinationCarrier: Int) {
+        val cursor = context.contentResolver.query(Uri.parse("$ROOT/$id"), uniqueColumns.toTypedArray(), null, null, null)
+            ?: error("APN 唯一鍵查詢失敗")
+        val values = cursor.use {
+            check(it.moveToFirst()) { "原 APN 項目已不存在" }
+            uniqueColumns.mapIndexed { index, column ->
+                if (column == "carrier_id") destinationCarrier.toString() else it.getString(index)
+            }
+        }
+        val selection = mutableListOf("_id <> ?")
+        val args = mutableListOf(id.toString())
+        uniqueColumns.forEachIndexed { index, column ->
+            val value = values[index]
+            if (value == null) selection += "$column IS NULL"
+            else { selection += "$column = ?"; args += value }
+        }
+        check(ids(context, ROOT, selection.joinToString(" AND "), args.toTypedArray()).isEmpty()) {
+            "APN 關聯存在唯一鍵衝突，未執行此列更新；備份已保留"
+        }
+    }
 
     fun prepare(context: Context, info: SubscriptionInfo) {
         check(info.simSlotIndex in 0..1) { "不支援此 SIM 卡槽的 APN 關聯" }
@@ -87,6 +119,7 @@ internal object SamsungApnCarrierBinding {
         check(prefs.edit().putString(simKey, backup.toString()).commit()) { "原 APN 關聯備份失敗" }
         try {
             rows.filter { it.carrier != carrier }.forEach { row ->
+                checkNoConflict(context, row.id, carrier)
                 val values = ContentValues().apply { put("carrier_id", carrier); put("edited", row.edited) }
                 check(context.contentResolver.update(Uri.parse("$ROOT/${row.id}"), values, null, null) == 1) {
                     "APN 關聯更新未確認"
@@ -135,6 +168,7 @@ internal object SamsungApnCarrierBinding {
             }
             if (state.first == row.getInt("carrier")) continue
             check(state.first == backup.getInt("carrier")) { "APN 關聯已被其他操作變更，備份已保留" }
+            checkNoConflict(context, row.getLong("id"), row.getInt("carrier"))
             val values = ContentValues().apply { put("carrier_id", row.getInt("carrier")); put("edited", state.second) }
             check(context.contentResolver.update(uri, values, null, null) == 1) { "原 APN 關聯還原未確認" }
             context.contentResolver.query(uri, arrayOf("carrier_id"), null, null, null)?.use {

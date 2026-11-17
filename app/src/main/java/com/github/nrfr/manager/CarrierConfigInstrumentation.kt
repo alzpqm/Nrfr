@@ -139,6 +139,10 @@ class CarrierConfigInstrumentation : Instrumentation() {
                             ApnDiagnostics.currentFlagRows(targetContext, info) else null
                         val otherCurrentRows = if (requestedNumeric != null && samsung && otherSim != null)
                             ApnDiagnostics.currentFlagRows(targetContext, otherSim) else null
+                        val otherFilteredRows = if (requestedNumeric != null && samsung && otherSim != null)
+                            SamsungApnCarrierBinding.filteredIds(targetContext, otherSim) else null
+                        val otherPreferredRows = if (requestedNumeric != null && samsung && otherSim != null)
+                            SamsungApnCarrierBinding.preferredIds(targetContext, otherSim) else null
                         val otherSettingsCount = if (requestedNumeric != null && samsung && otherSim != null)
                             ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) else null
                         if (requestedNumeric != null && previous != null && previous.numeric != requestedNumeric) {
@@ -179,6 +183,11 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                         ApnDiagnostics.currentFlagRows(targetContext, otherSim) == otherCurrentRows) {
                                         "另一張 SIM 的 APN 電信業者狀態已改變"
                                     }
+                                    if (otherSim != null && otherFilteredRows != null && otherPreferredRows != null) check(
+                                        SamsungApnCarrierBinding.filteredIds(targetContext, otherSim) == otherFilteredRows &&
+                                        SamsungApnCarrierBinding.preferredIds(targetContext, otherSim) == otherPreferredRows) {
+                                        "另一張 SIM 的數據 APN 或選取已改變"
+                                    }
                                 }
                             },
                             applyConfig = {
@@ -204,6 +213,11 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                     if (otherSim != null && otherCurrentRows != null) check(
                                         ApnDiagnostics.currentFlagRows(targetContext, otherSim) == otherCurrentRows) {
                                         "另一張 SIM 的 APN 電信業者狀態已改變"
+                                    }
+                                    if (otherSim != null && otherFilteredRows != null && otherPreferredRows != null) check(
+                                        SamsungApnCarrierBinding.filteredIds(targetContext, otherSim) == otherFilteredRows &&
+                                        SamsungApnCarrierBinding.preferredIds(targetContext, otherSim) == otherPreferredRows) {
+                                        "另一張 SIM 的數據 APN 或選取已改變"
                                     }
                                 }
                             },
@@ -240,6 +254,11 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                     if (otherSim != null && otherCurrentRows != null) check(
                                         ApnDiagnostics.currentFlagRows(targetContext, otherSim) == otherCurrentRows) {
                                         "另一張 SIM 的 APN 電信業者狀態尚未恢復"
+                                    }
+                                    if (otherSim != null && otherFilteredRows != null && otherPreferredRows != null) check(
+                                        SamsungApnCarrierBinding.filteredIds(targetContext, otherSim) == otherFilteredRows &&
+                                        SamsungApnCarrierBinding.preferredIds(targetContext, otherSim) == otherPreferredRows) {
+                                        "另一張 SIM 的數據 APN 或選取尚未恢復"
                                     }
                                 }
                             },
