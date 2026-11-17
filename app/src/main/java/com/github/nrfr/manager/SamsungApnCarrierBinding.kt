@@ -45,6 +45,25 @@ internal object SamsungApnCarrierBinding {
         ids(context, "$ROOT/sim_apn_list/${info.subscriptionId}",
             "NOT (type='ia' AND (apn=\"\" OR apn IS NULL)) AND ${if (info.simSlotIndex == 0) "current" else "current1"} = 1")
 
+    private fun readRow(context: Context, id: Long): Map<String, String?> {
+        val cursor = context.contentResolver.query(Uri.parse("$ROOT/$id"), null, null, null, null)
+            ?: error("APN 項目查詢未回傳資料")
+        return cursor.use {
+            check(it.moveToFirst()) { "APN 項目已不存在" }
+            it.columnNames.mapIndexed { index, column -> column to it.getString(index) }.toMap()
+        }
+    }
+
+    private fun contentFingerprint(row: Map<String, String?>): String {
+        val ignored = setOf("carrier_id", "edited", "current", "current1")
+        val canonical = JSONArray()
+        row.toSortedMap().filterKeys { it !in ignored }.forEach { (column, value) ->
+            canonical.put(JSONArray().put(column).put(value ?: JSONObject.NULL))
+        }
+        return MessageDigest.getInstance("SHA-256").digest(canonical.toString().toByteArray())
+            .joinToString("") { "%02x".format(it) }
+    }
+
     fun filteredIds(context: Context, info: SubscriptionInfo): Set<Long> =
         ids(context, "$ROOT/sim_apn_list/filtered/subId/${info.subscriptionId}")
 
@@ -124,7 +143,8 @@ internal object SamsungApnCarrierBinding {
             }
         }
         val savedRows = JSONArray()
-        rows.forEach { savedRows.put(JSONObject().put("id", it.id).put("carrier", it.carrier).put("edited", it.edited)) }
+        rows.forEach { savedRows.put(JSONObject().put("id", it.id).put("carrier", it.carrier).put("edited", it.edited)
+            .put("contentFingerprint", contentFingerprint(readRow(context, it.id)))) }
         val backup = JSONObject().put("carrier", carrier).put("rows", savedRows)
             .put("originalNumeric", original).put("testNumeric", testNumeric)
             .put("preexisting", JSONArray(ids(context, ROOT, "numeric = ?", arrayOf(testNumeric)).toList()))
@@ -177,6 +197,12 @@ internal object SamsungApnCarrierBinding {
         } }
         var changed = 0
         for (row in candidates) {
+            val before = readRow(context, row.id)
+            check(before["numeric"] == testNumeric && before["edited"] == "1" &&
+                before["sub_id"] == info.subscriptionId.toString() &&
+                before["sim_slot"] == info.simSlotIndex.toString() && before["carrier_id"] == row.carrier.toString()) {
+                "新增 APN 已變更，未執行此次維護"
+            }
             check(row.carrier == -1 || row.carrier == backup.getInt("carrier")) {
                 "新增 APN 的電信關聯不符，未修改此項目"
             }
@@ -194,21 +220,31 @@ internal object SamsungApnCarrierBinding {
                 check(prefs.edit().putString(simKey, backup.toString()).commit()) { "新增 APN 關聯備份失敗" }
             }
             checkNoConflict(context, row.id, backup.getInt("carrier"), original)
+            check(readRow(context, row.id) == before) { "新增 APN 正在編輯，請完成後再試" }
+            if (context.packageName.endsWith(".s25")) {
+                ApnResearchSnapshot.capture(context, listOf(info), "before-new-apn-normalize")
+            }
             val values = ContentValues().apply {
                 put("numeric", original); put("mcc", original.take(3)); put("mnc", original.drop(3))
                 put("carrier_id", backup.getInt("carrier")); put("edited", row.edited)
                 put(if (info.simSlotIndex == 0) "current" else "current1", 1)
             }
-            check(context.contentResolver.update(uri, values,
-                "numeric = ? AND edited = 1 AND sub_id = ? AND sim_slot = ? AND carrier_id = ?",
-                arrayOf(testNumeric, info.subscriptionId.toString(), info.simSlotIndex.toString(), row.carrier.toString())) == 1) {
+            // Samsung rejects any extra selection on an item URI. Keep this item update;
+            // the collection URI uses REPLACE. Preflight/readback cannot lock out external writers.
+            check(context.contentResolver.update(uri, values, null, null) == 1) {
                 "新增 APN 已變更，未確認此次維護"
             }
-            context.contentResolver.query(uri, arrayOf("numeric", "carrier_id"), null, null, null)?.use {
-                check(it.moveToFirst() && it.getString(0) == original && it.getInt(1) == backup.getInt("carrier")) {
-                    "新增 APN 維護回讀不一致"
-                }
-            } ?: error("新增 APN 維護回讀失敗")
+            val after = readRow(context, row.id)
+            check(after["numeric"] == original && after["mcc"] == original.take(3) &&
+                after["mnc"] == original.drop(3) && after["carrier_id"] == backup.getInt("carrier").toString() &&
+                after[if (info.simSlotIndex == 0) "current" else "current1"] == "1") {
+                "新增 APN 維護回讀不一致"
+            }
+            val modified = setOf("numeric", "mcc", "mnc", "carrier_id",
+                if (info.simSlotIndex == 0) "current" else "current1")
+            check(before.filterKeys { it !in modified } == after.filterKeys { it !in modified }) {
+                "新增 APN 其他欄位有變更，請核對後再試；備份已保留"
+            }
             entry.put("normalized", true)
             check(prefs.edit().putString(simKey, backup.toString()).commit()) { "新增 APN 維護紀錄失敗" }
             changed++
@@ -257,7 +293,12 @@ internal object SamsungApnCarrierBinding {
             if (state.first == row.getInt("carrier")) continue
             check(state.first == backup.getInt("carrier")) { "APN 關聯已被其他操作變更，備份已保留" }
             checkNoConflict(context, row.getLong("id"), row.getInt("carrier"))
-            val values = ContentValues().apply { put("carrier_id", row.getInt("carrier")); put("edited", state.second) }
+            // Undo the test's metadata only when all APN content is back at its original
+            // value. Keep the user's edited marker when any connection/name field changed.
+            val edited = if (row.has("contentFingerprint") &&
+                row.getString("contentFingerprint") == contentFingerprint(readRow(context, row.getLong("id"))))
+                row.getInt("edited") else state.second
+            val values = ContentValues().apply { put("carrier_id", row.getInt("carrier")); put("edited", edited) }
             check(context.contentResolver.update(uri, values, null, null) == 1) { "原 APN 關聯還原未確認" }
             context.contentResolver.query(uri, arrayOf("carrier_id"), null, null, null)?.use {
                 check(it.moveToFirst() && it.getInt(0) == row.getInt("carrier")) { "原 APN 關聯回讀不一致" }

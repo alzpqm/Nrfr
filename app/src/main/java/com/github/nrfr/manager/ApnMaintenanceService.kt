@@ -14,6 +14,7 @@ import android.os.IBinder
 import android.os.Looper
 import com.github.nrfr.MainActivity
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -39,11 +40,16 @@ class ApnMaintenanceService : Service() {
         showNotification("修改 SIM 代碼期間，保留實際網路的 APN；請勿強制停止 Nrfr。")
     }
 
-    private fun showNotification(message: String) {
+    private fun showNotification(message: String, failed: Boolean = false) {
         val intent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-        startForeground(41, Notification.Builder(this, CHANNEL)
-            .setSmallIcon(android.R.drawable.stat_notify_sync).setContentTitle("Nrfr：SIM APN 維護中")
-            .setContentText(message).setContentIntent(intent).setOngoing(true).build())
+        val notification = Notification.Builder(this, CHANNEL)
+            .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setContentTitle(if (failed) "Nrfr：APN 維護未完成" else "Nrfr：SIM APN 維護中")
+            .setContentText(message).setContentIntent(intent).setOngoing(true)
+        if (failed) notification.addAction(Notification.Action.Builder(null, "重試 APN 維護",
+            PendingIntent.getForegroundService(this, 1, Intent(this, ApnMaintenanceService::class.java)
+                .setAction("com.github.nrfr.RETRY_APN_MAINTENANCE"), PendingIntent.FLAG_IMMUTABLE)).build())
+        startForeground(41, notification.build())
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -53,6 +59,7 @@ class ApnMaintenanceService : Service() {
 
     private fun schedule() {
         dirty = true
+        setPending(true)
         if (working) return
         working = true
         scope.launch {
@@ -69,14 +76,25 @@ class ApnMaintenanceService : Service() {
                             PrivilegedCarrierConfigRunner.Request.ReconcileApns)
                         reconciliations++
                         changes += result.getInt("apn_changes")
+                        if (!dirty) {
+                            setPending(false)
+                            showNotification("修改 SIM 代碼期間，保留實際網路的 APN；請勿強制停止 Nrfr。")
+                        }
                         writeStatus("ok")
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled // Runner waits for already-started delegation to finish.
                     } catch (failure: Exception) {
                         writeStatus("failed", failure)
-                        showNotification("APN 維護未完成，請開啟 Nrfr 核對 Nightzuku／Shizuku 或還原設定。")
+                        showNotification("請核對 Nightzuku／Shizuku 後點按重試，或開啟 Nrfr 還原設定。", true)
+                        break // Keep pending; retry only on a new event, restart or explicit action.
                     }
                 }
             } finally { working = false }
         }
+    }
+
+    private fun setPending(pending: Boolean) {
+        getSharedPreferences("apn_maintenance_state", MODE_PRIVATE).edit().putBoolean("pending", pending).apply()
     }
 
     private fun writeStatus(status: String, failure: Exception? = null) {
@@ -84,6 +102,7 @@ class ApnMaintenanceService : Service() {
         val directory = getExternalFilesDir("apn-research") ?: return
         File(directory, "maintenance.json").writeText(JSONObject().put("status", status)
             .put("events", events).put("reconciliations", reconciliations).put("changes", changes)
+            .put("pending", getSharedPreferences("apn_maintenance_state", MODE_PRIVATE).getBoolean("pending", false))
             .put("errorClass", failure?.javaClass?.simpleName).put("error", failure?.message).toString())
     }
 
@@ -94,6 +113,7 @@ class ApnMaintenanceService : Service() {
             observer = null
         }
         scope.cancel()
+        if (!SamsungApnCarrierBinding.hasAnyBackup(this)) setPending(false)
         super.onDestroy()
     }
 

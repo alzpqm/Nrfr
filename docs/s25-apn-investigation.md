@@ -1,5 +1,45 @@
 # APN safety investigation (not a verified S25 repair)
 
+## Second return: the APN save update now passes the tested path
+
+The diagnostic build identified the save failure precisely: Samsung rejects
+an item-URI update with a non-null selection or selection arguments. The actual
+device implementation has the same explicit check. The repair keeps the item
+URI and passes null selection/arguments, with a fresh row check, full unique-key
+preflight and complete readback. It does not switch to the collection URI, whose
+update path uses REPLACE. These checks do not provide a transaction against
+external writers.
+
+With the SIM-numeric checkbox checked and MCC preserved, the new APN appeared
+on the first captured return to Settings and remained after settling and
+reopening. Before/after private snapshots confirmed the same row ID and
+unchanged fields except numeric, MCC, MNC, carrier ID and the selected slot's
+current flag. The preferred APN ID stayed unchanged. The other SIM's complete
+raw rows and preferred row stayed identical to baseline.
+
+Editing the new APN's name and saving retained the same ID, changed only its
+name and kept it visible. Restarting Nrfr preserved the complete rows and
+preference without duplicate normalization writes. Deleting the test APN
+removed it without recreation. Editing an original APN's name also saved and
+stayed visible; its connection fields and preferred ID did not change, and
+bound-SIM DNS/HTTPS returned 204.
+
+An automation mistake selected the invalid test APN by clicking its title;
+Samsung uses that gesture for selection and the gear for editing. That probe
+failed DNS. After selecting an original valid APN, DNS/HTTPS passed. A subsequent
+data disconnect/reconnect produced a new Network handle and passed DNS/HTTPS
+204 again. The exact original preferred ID was separately read back and its
+bound-SIM DNS/HTTPS probe passed. These were cellular Networks with verified
+subscription identity, excluding Wi-Fi and the other SIM.
+
+The service now rethrows coroutine cancellation, retains pending failure state
+and offers an explicit notification retry. Already-started instrumentation is
+allowed to finish releasing delegation before the runner permits another
+request. No unbounded retry was added. Assembly, lint and 68 unit tests passed.
+
+Clearing Nrfr data, resetting all APNs and long-term behavior are not verified.
+This remains a diagnostic candidate, not a claim that all S25 cases are fixed.
+
 ## 2026-11-17 return: existing APNs preserved; new saves still fail
 
 On the returned S25 (Android 17 / One UI 9), the operator-numeric checkbox was
