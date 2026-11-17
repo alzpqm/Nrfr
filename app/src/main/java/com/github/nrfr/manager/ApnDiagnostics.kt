@@ -98,7 +98,7 @@ internal object ApnDiagnostics {
         return "rawOriginal=$original rawCurrent=$current visible=$visible " +
             "filtered=$filtered preferred=$preferred " +
             "simMatchesSubscription=${currentNumeric == subscriptionNumeric} " +
-            "carrierId=${telephony.simSpecificCarrierId} " +
+            "simCarrierId=${telephony.simCarrierId} specificCarrierId=${telephony.simSpecificCarrierId} " +
             "defaultData=${SubscriptionManager.getDefaultDataSubscriptionId() == subId}"
     }
 }

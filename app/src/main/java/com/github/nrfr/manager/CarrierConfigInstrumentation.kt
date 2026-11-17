@@ -45,6 +45,10 @@ class CarrierConfigInstrumentation : Instrumentation() {
                 Manifest.permission.READ_PHONE_STATE,
                 "android.permission.READ_PRIVILEGED_PHONE_STATE",
             )
+            if (request is PrivilegedCarrierConfigRunner.Request.ReadSimCards &&
+                targetContext.packageName.endsWith(".s25")) {
+                permissions += Manifest.permission.WRITE_APN_SETTINGS
+            }
             if (request is PrivilegedCarrierConfigRunner.Request.Override) {
                 permissions += Manifest.permission.MODIFY_PHONE_STATE
                 if (request.operatorNumeric != null ||
@@ -74,6 +78,9 @@ class CarrierConfigInstrumentation : Instrumentation() {
                         }
                     }
                     result.putParcelableArrayList(PrivilegedCarrierConfigRunner.RESULT_SIM_CARDS, ArrayList(cards))
+                    if (targetContext.packageName.endsWith(".s25")) {
+                        ApnResearchSnapshot.capture(targetContext, subscriptions)
+                    }
                     // Candidate diagnosis only: a permission denial is never an empty APN list.
                     subscriptions.forEach { info ->
                         try {
