@@ -1,4 +1,61 @@
-# APN safety investigation (not a verified S25 repair)
+# S25 APN investigation and bounded device evidence
+
+## Wired return: Nightzuku and recovery after clearing app data
+
+The S25 ran Android 17 / One UI 9 and its installed Nightzuku
+13.7.1.r53.fce85e4. The candidate now uses the official Nightzuku API and
+provider artifacts 13.2.1. Its supported UserService ran as shell UID 2000;
+fixed-file write/read/delete, directory mode 0700 and file mode 0600 were
+verified on this device. No broker replacement, root or phone reboot was used.
+The older RemoteProcess transport returned no useful output in this test;
+its cause was not established and it is not used for recovery.
+
+Before an identity or APN metadata write, the candidate atomically stores and
+reads back its three recovery records outside the app's clear-data directory,
+under a package/certificate namespace. The durable copy is authoritative after
+initial migration. Local stale records cannot overwrite a newer durable entry
+or resurrect an entry removed during restore. An empty document remains after
+cleanup, without any SIM record. Three regression tests cover these cases and
+inactive-SIM isolation; all 71 unit tests, lint and diagnostic assembly passed.
+
+SIM 1 was selected with **Modify SIM operator numeric checked**; only MNC
+changed and MCC stayed original. The IMSI argument remained null. After
+exporting an emergency private backup, only the sidecar's app data was cleared.
+Normal reopening restored all three records exactly, **without manual import**.
+Both SIMs' full APN rows and preferred rows remained exactly unchanged by clear.
+The shell file was readable as UID 2000 and had the verified permissions above.
+
+After reopening, a new APN saved through Samsung Settings appeared on the first
+captured return and after settling. Before/after snapshots confirmed the same
+row ID and no changes outside numeric, MCC, MNC, carrier ID and the target
+slot's current flag. The original preferred row and SIM 2's full rows/preference
+were unchanged. Reopening the saved row retained its contents; resaving and
+reopening retained them again. The temporary row was then deleted.
+
+While the modified MNC was still active, a Network explicitly requested for
+SIM 1 verified its subscription and cellular transport, excluded Wi-Fi, and
+passed Network-bound DNS and HTTPS 204. Disabling and re-enabling mobile data
+produced a different Network handle and the same checks passed again.
+
+Full Restore returned both SIM numerics, full original APN rows and full
+preferred rows exactly to baseline without reboot. The temporary carrier rule
+was absent, all three durable record groups were empty, and the maintenance
+service stopped. A cold app reopen did not resurrect records. Both SIMs' three
+country/name override fields, the original default-data SIM and USB stay-awake
+setting were restored; the original data SIM passed bound DNS/HTTPS 204.
+
+An automated text entry was initially converted by Gboard Pinyin; exact input
+checks stopped before saving. English input then matched exactly and the
+original Pinyin mode was restored. These checks belong to the local test
+automation, not a restriction in Nrfr or Samsung Settings.
+
+This supports the published S25 sidecar candidate's tested paths. Clearing
+data still requires reopening Nrfr and a working Nightzuku grant before new
+APN maintenance. All-APN factory reset, phone reboot persistence, long-term
+behavior and other device/build combinations remain unverified. The original
+1.1.4 app was retained; raw evidence and signing material remain outside Git.
+
+The sections below describe earlier candidates and their historical failures.
 
 ## Second return: the APN save update now passes the tested path
 

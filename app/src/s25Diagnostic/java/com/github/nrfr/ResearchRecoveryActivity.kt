@@ -6,8 +6,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import com.github.nrfr.manager.PrivilegedCarrierConfigRunner
+import com.github.nrfr.manager.NightzukuRecoveryStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
@@ -22,7 +25,7 @@ class ResearchRecoveryActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val operation = intent.getStringExtra("operation")
         val label = intent.getStringExtra("label").orEmpty()
-        if (operation !in listOf("backup", "import") || !label.matches(Regex("[a-zA-Z0-9_-]{1,40}"))) {
+        if (operation !in listOf("backup", "import", "storage-probe") || !label.matches(Regex("[a-zA-Z0-9_-]{1,40}"))) {
             finish(); return
         }
         lifecycleScope.launch {
@@ -34,13 +37,18 @@ class ResearchRecoveryActivity : ComponentActivity() {
                 @Suppress("DEPRECATION")
                 val cards = reply.getParcelableArrayList<Bundle>(PrivilegedCarrierConfigRunner.RESULT_SIM_CARDS).orEmpty()
                 val simKeys = cards.map { checkNotNull(it.getString("research_sim_key")) }.toSet()
-                check(simKeys.isNotEmpty() && simKeys.all { it.matches(Regex("[a-f0-9]{64}")) })
+                report.put("cards", cards.size).put("scopeKeys", simKeys.size).put("stage", "sim_scope")
+                check(simKeys.isNotEmpty() && simKeys.all { it.matches(Regex("[a-f0-9]{64}")) }) { "SIM recovery scope unavailable" }
                 val packageInfo = packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
                 val certificate = checkNotNull(packageInfo.signingInfo).apkContentsSigners.single().toByteArray()
                 val fingerprint = MessageDigest.getInstance("SHA-256").digest(certificate)
                     .joinToString("") { "%02x".format(it) }
                 val file = File(directory, "$label.json")
-                if (operation == "backup") {
+                if (operation == "storage-probe") {
+                    report.put("stage", "storage")
+                    check(withContext(Dispatchers.IO) { NightzukuRecoveryStore.probe(this@ResearchRecoveryActivity) })
+                    report.put("uid", rikka.shizuku.Shizuku.getUid())
+                } else if (operation == "backup") {
                     val records = JSONObject()
                     names.forEach { name ->
                         val values = getSharedPreferences(name, Context.MODE_PRIVATE).all
@@ -72,9 +80,12 @@ class ResearchRecoveryActivity : ComponentActivity() {
                     }
                     parsed.forEach { (name, values) ->
                         val prefs = getSharedPreferences(name, Context.MODE_PRIVATE)
-                        val editor = prefs.edit()
-                        values.forEach { (key, value) -> editor.putString(key, value) }
-                        check(editor.commit() && prefs.all == values) { "回復紀錄回讀未確認" }
+                        values.forEach { (key, value) ->
+                            check(withContext(Dispatchers.IO) {
+                                NightzukuRecoveryStore.put(this@ResearchRecoveryActivity, name, key, value)
+                            })
+                        }
+                        check(prefs.all == values) { "回復紀錄回讀未確認" }
                     }
                     report.put("records", parsed.values.sumOf { it.size })
                 }

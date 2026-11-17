@@ -42,7 +42,7 @@ internal object SamsungCarrierRule {
         } ?: error("電信識別規則查詢未回傳資料")
         val name = phone.simCarrierIdName?.toString().orEmpty()
         val backup = JSONObject().put("numeric", numeric).put("iccid", iccid).put("carrier", carrier)
-        check(prefs.edit().putString(simKey, backup.toString()).commit()) { "電信識別規則備份失敗" }
+        check(NightzukuRecoveryStore.put(context, PREFS, simKey, backup.toString())) { "電信識別規則備份失敗" }
         val values = ContentValues().apply {
             put("mccmnc", numeric); put("iccid_prefix", iccid); put("carrier_id", carrier)
             put("carrier_name", name); put("parent_carrier_id", -1)
@@ -51,7 +51,7 @@ internal object SamsungCarrierRule {
             val inserted = context.contentResolver.insert(all, values) ?: error("SIM 專用電信識別規則未新增")
             val id = checkNotNull(inserted.lastPathSegment?.toLongOrNull())
             backup.put("id", id)
-            check(prefs.edit().putString(simKey, backup.toString()).commit()) { "電信識別規則回復紀錄失敗" }
+            check(NightzukuRecoveryStore.put(context, PREFS, simKey, backup.toString())) { "電信識別規則回復紀錄失敗" }
         } catch (failure: Exception) {
             try { restore(context, info) } catch (rollback: Exception) { failure.addSuppressed(rollback) }
             throw failure
@@ -76,6 +76,6 @@ internal object SamsungCarrierRule {
         context.contentResolver.query(all, arrayOf("_id"), selection, args.toTypedArray(), null)?.use {
             check(it.count == 0) { "SIM 專用電信識別規則仍存在" }
         } ?: error("電信識別規則還原回讀失敗")
-        check(prefs.edit().remove(simKey).commit()) { "電信識別規則已還原，備份清理失敗" }
+        check(NightzukuRecoveryStore.remove(context, PREFS, simKey)) { "電信識別規則已還原，備份清理失敗" }
     }
 }

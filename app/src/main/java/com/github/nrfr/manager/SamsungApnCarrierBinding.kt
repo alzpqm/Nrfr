@@ -150,7 +150,7 @@ internal object SamsungApnCarrierBinding {
             .put("preexisting", JSONArray(ids(context, ROOT, "numeric = ?", arrayOf(testNumeric)).toList()))
             .put("filtered", JSONArray(filtered.toList())).put("settings", JSONArray(settings.toList()))
             .put("preferred", JSONArray(preferred.toList()))
-        check(prefs.edit().putString(simKey, backup.toString()).commit()) { "原 APN 關聯備份失敗" }
+        check(NightzukuRecoveryStore.put(context, PREFS, simKey, backup.toString())) { "原 APN 關聯備份失敗" }
         try {
             rows.filter { it.carrier != carrier }.forEach { row ->
                 checkNoConflict(context, row.id, carrier)
@@ -217,7 +217,7 @@ internal object SamsungApnCarrierBinding {
                 entry = JSONObject().put("id", row.id).put("carrier", row.carrier)
                     .put("edited", row.edited).put("created", true).put("createdNumeric", testNumeric)
                 rows.put(entry)
-                check(prefs.edit().putString(simKey, backup.toString()).commit()) { "新增 APN 關聯備份失敗" }
+                check(NightzukuRecoveryStore.put(context, PREFS, simKey, backup.toString())) { "新增 APN 關聯備份失敗" }
             }
             checkNoConflict(context, row.id, backup.getInt("carrier"), original)
             check(readRow(context, row.id) == before) { "新增 APN 正在編輯，請完成後再試" }
@@ -246,7 +246,7 @@ internal object SamsungApnCarrierBinding {
                 "新增 APN 其他欄位有變更，請核對後再試；備份已保留"
             }
             entry.put("normalized", true)
-            check(prefs.edit().putString(simKey, backup.toString()).commit()) { "新增 APN 維護紀錄失敗" }
+            check(NightzukuRecoveryStore.put(context, PREFS, simKey, backup.toString())) { "新增 APN 維護紀錄失敗" }
             changed++
         }
         return changed
@@ -305,6 +305,6 @@ internal object SamsungApnCarrierBinding {
             } ?: error("原 APN 關聯回讀失敗")
         }
         check(!missingRows) { "部分原 APN 已被刪除；現存項目關聯已還原，備份已保留" }
-        check(prefs.edit().remove(simKey).commit()) { "APN 已還原，關聯備份清理失敗" }
+        check(NightzukuRecoveryStore.remove(context, PREFS, simKey)) { "APN 已還原，關聯備份清理失敗" }
     }
 }

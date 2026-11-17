@@ -14,7 +14,7 @@ android {
         applicationId = "com.github.nrfr"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12 // Signed diagnostic candidate; no public release
+        versionCode = 12 // S25 prerelease candidate
         versionName = "1.1.5-rc1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -39,6 +39,7 @@ android {
     }
     buildFeatures {
         compose = true
+        aidl = true
     }
 }
 
@@ -52,9 +53,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
 
-    // Shizuku
-    implementation("dev.rikka.shizuku:api:13.1.5")
-    implementation("dev.rikka.shizuku:provider:13.1.5")
+    // Nightzuku's Android 17 client, including its legacy Shizuku compatibility wire.
+    implementation("io.github.kerneldroid:api:13.2.1")
+    implementation("io.github.kerneldroid:provider:13.2.1")
     implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     // Signatures only: the device supplies these hidden framework classes.

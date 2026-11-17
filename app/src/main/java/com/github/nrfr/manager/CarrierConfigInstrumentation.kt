@@ -39,7 +39,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
             }
             val deadline = SystemClock.elapsedRealtime() + 3_000L
             while (!Shizuku.pingBinder() && SystemClock.elapsedRealtime() < deadline) Thread.sleep(100)
-            check(Shizuku.pingBinder()) { "Shizuku 未執行" }
+            check(Shizuku.pingBinder()) { "Nightzuku／Shizuku 未執行" }
             manager = PrivilegedCarrierConfigRunner.activityManager()
             val permissions = mutableListOf(
                 Manifest.permission.READ_PHONE_STATE,
@@ -64,6 +64,10 @@ class CarrierConfigInstrumentation : Instrumentation() {
             val subscriptions = targetContext.getSystemService(SubscriptionManager::class.java)
                 ?.activeSubscriptionInfoList.orEmpty()
                 .filter { it.subscriptionId >= 0 && it.simSlotIndex >= 0 }
+            NightzukuRecoveryStore.restoreLocal(targetContext, subscriptions.map { info ->
+                java.security.MessageDigest.getInstance("SHA-256").digest(info.iccId.toByteArray())
+                    .joinToString("") { "%02x".format(it) }
+            }.toSet())
             when (request) {
                 PrivilegedCarrierConfigRunner.Request.ReconcileApns -> {
                     if (SamsungApnCarrierBinding.hasAnyBackup(targetContext)) ApnMaintenanceService.ensureWatching(targetContext)
@@ -145,7 +149,10 @@ class CarrierConfigInstrumentation : Instrumentation() {
                         result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_PERSISTENT, report.persistent)
                         result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_REQUIRES_RESTART, report.requiresRestart)
                         result.putString(PrivilegedCarrierConfigRunner.RESULT_RESTORED_NUMERIC, report.restoredNumeric)
-                        result.putString(PrivilegedCarrierConfigRunner.RESULT_WARNING, report.warning)
+                        val storageWarning = if (arguments?.getBoolean(PrivilegedCarrierConfigRunner.ARG_RECOVERY_UNAVAILABLE) == true)
+                            "原代碼還原已執行；Nightzuku 還原紀錄目前不可用，請核對 APN 狀態。" else null
+                        result.putString(PrivilegedCarrierConfigRunner.RESULT_WARNING,
+                            listOfNotNull(report.warning, storageWarning).takeIf { it.isNotEmpty() }?.joinToString("\n"))
                     } else {
                         val requestedNumeric = request.operatorNumeric
                         val previous = requestedNumeric?.let { CarrierIdentityAccess.previous(targetContext, info) }
