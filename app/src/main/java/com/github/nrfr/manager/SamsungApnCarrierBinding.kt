@@ -31,6 +31,9 @@ internal object SamsungApnCarrierBinding {
     fun hasBackup(context: Context, info: SubscriptionInfo): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).contains(key(info))
 
+    fun hasAnyBackup(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).all.isNotEmpty()
+
     private fun ids(context: Context, uri: String, selection: String? = null,
         args: Array<String>? = null): Set<Long> {
         val cursor = context.contentResolver.query(Uri.parse(uri), arrayOf("_id"), selection, args, null)
@@ -48,13 +51,19 @@ internal object SamsungApnCarrierBinding {
     fun preferredIds(context: Context, info: SubscriptionInfo): Set<Long> =
         ids(context, "$ROOT/preferapn/subId/${info.subscriptionId}")
 
-    private fun checkNoConflict(context: Context, id: Long, destinationCarrier: Int) {
+    private fun checkNoConflict(context: Context, id: Long, destinationCarrier: Int, numeric: String? = null) {
         val cursor = context.contentResolver.query(Uri.parse("$ROOT/$id"), uniqueColumns.toTypedArray(), null, null, null)
             ?: error("APN 唯一鍵查詢失敗")
         val values = cursor.use {
             check(it.moveToFirst()) { "原 APN 項目已不存在" }
             uniqueColumns.mapIndexed { index, column ->
-                if (column == "carrier_id") destinationCarrier.toString() else it.getString(index)
+                when (column) {
+                    "carrier_id" -> destinationCarrier.toString()
+                    "numeric" -> numeric ?: it.getString(index)
+                    "mcc" -> numeric?.take(3) ?: it.getString(index)
+                    "mnc" -> numeric?.drop(3) ?: it.getString(index)
+                    else -> it.getString(index)
+                }
             }
         }
         val selection = mutableListOf("_id <> ?")
@@ -71,7 +80,7 @@ internal object SamsungApnCarrierBinding {
 
     // Called only within the instrumentation's scoped READ_PHONE_STATE delegation.
     @SuppressLint("MissingPermission")
-    fun prepare(context: Context, info: SubscriptionInfo) {
+    fun prepare(context: Context, info: SubscriptionInfo, testNumeric: String) {
         check(info.simSlotIndex in 0..1) { "不支援此 SIM 卡槽的 APN 關聯" }
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val simKey = key(info)
@@ -117,6 +126,8 @@ internal object SamsungApnCarrierBinding {
         val savedRows = JSONArray()
         rows.forEach { savedRows.put(JSONObject().put("id", it.id).put("carrier", it.carrier).put("edited", it.edited)) }
         val backup = JSONObject().put("carrier", carrier).put("rows", savedRows)
+            .put("originalNumeric", original).put("testNumeric", testNumeric)
+            .put("preexisting", JSONArray(ids(context, ROOT, "numeric = ?", arrayOf(testNumeric)).toList()))
             .put("filtered", JSONArray(filtered.toList())).put("settings", JSONArray(settings.toList()))
             .put("preferred", JSONArray(preferred.toList()))
         check(prefs.edit().putString(simKey, backup.toString()).commit()) { "原 APN 關聯備份失敗" }
@@ -132,6 +143,77 @@ internal object SamsungApnCarrierBinding {
             try { restore(context, info) } catch (rollback: Exception) { failure.addSuppressed(rollback) }
             throw failure
         }
+    }
+
+    /** Samsung's editor seeds numeric from the overridden SIM property. Keep the user's
+     * new APN on the actual connection network, without copying an APN or selecting it. */
+    @SuppressLint("MissingPermission")
+    fun reconcileNewApns(context: Context, info: SubscriptionInfo): Int {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val simKey = key(info)
+        val backup = prefs.getString(simKey, null)?.let(::JSONObject) ?: return 0
+        if (!backup.has("testNumeric")) return 0 // Older backup: restore before migrating.
+        val original = backup.getString("originalNumeric")
+        val testNumeric = backup.getString("testNumeric")
+        val phone = context.getSystemService(TelephonyManager::class.java).createForSubscriptionId(info.subscriptionId)
+        if (phone.simOperator != testNumeric || !SamsungCarrierRule.hasBackup(context, info)) return 0
+        check(phone.simCarrierId == backup.getInt("carrier")) { "SIM 電信識別已改變，APN 維護已停止" }
+        val rows = backup.getJSONArray("rows")
+        val excluded = backup.getJSONArray("preexisting").let { values ->
+            (0 until values.length()).map { values.getLong(it) }.toMutableSet()
+        }
+        for (i in 0 until rows.length()) {
+            val row = rows.getJSONObject(i)
+            if (!row.optBoolean("created")) excluded += row.getLong("id")
+        }
+        val cursor = context.contentResolver.query(Uri.parse(ROOT),
+            arrayOf("_id", "carrier_id", "edited"),
+            "numeric = ? AND edited = 1 AND sub_id = ? AND sim_slot = ?",
+            arrayOf(testNumeric, info.subscriptionId.toString(), info.simSlotIndex.toString()), null)
+            ?: error("新增 APN 查詢未回傳資料")
+        val candidates = cursor.use { buildList {
+            while (it.moveToNext()) if (it.getLong(0) !in excluded)
+                add(Row(it.getLong(0), it.getInt(1), it.getInt(2), 0))
+        } }
+        var changed = 0
+        for (row in candidates) {
+            check(row.carrier == -1 || row.carrier == backup.getInt("carrier")) {
+                "新增 APN 的電信關聯不符，未修改此項目"
+            }
+            val otherFlag = if (info.simSlotIndex == 0) "current1" else "current"
+            val uri = Uri.parse("$ROOT/${row.id}")
+            context.contentResolver.query(uri, arrayOf(otherFlag), null, null, null)?.use {
+                check(it.moveToFirst() && it.getInt(0) != 1) { "新增 APN 為雙卡共用，未修改此項目" }
+            } ?: error("新增 APN 卡槽查詢失敗")
+            var entry = (0 until rows.length()).map { rows.getJSONObject(it) }
+                .firstOrNull { it.getLong("id") == row.id }
+            if (entry == null) {
+                entry = JSONObject().put("id", row.id).put("carrier", row.carrier)
+                    .put("edited", row.edited).put("created", true).put("createdNumeric", testNumeric)
+                rows.put(entry)
+                check(prefs.edit().putString(simKey, backup.toString()).commit()) { "新增 APN 關聯備份失敗" }
+            }
+            checkNoConflict(context, row.id, backup.getInt("carrier"), original)
+            val values = ContentValues().apply {
+                put("numeric", original); put("mcc", original.take(3)); put("mnc", original.drop(3))
+                put("carrier_id", backup.getInt("carrier")); put("edited", row.edited)
+                put(if (info.simSlotIndex == 0) "current" else "current1", 1)
+            }
+            check(context.contentResolver.update(uri, values,
+                "numeric = ? AND edited = 1 AND sub_id = ? AND sim_slot = ? AND carrier_id = ?",
+                arrayOf(testNumeric, info.subscriptionId.toString(), info.simSlotIndex.toString(), row.carrier.toString())) == 1) {
+                "新增 APN 已變更，未確認此次維護"
+            }
+            context.contentResolver.query(uri, arrayOf("numeric", "carrier_id"), null, null, null)?.use {
+                check(it.moveToFirst() && it.getString(0) == original && it.getInt(1) == backup.getInt("carrier")) {
+                    "新增 APN 維護回讀不一致"
+                }
+            } ?: error("新增 APN 維護回讀失敗")
+            entry.put("normalized", true)
+            check(prefs.edit().putString(simKey, backup.toString()).commit()) { "新增 APN 維護紀錄失敗" }
+            changed++
+        }
+        return changed
     }
 
     fun verify(context: Context, info: SubscriptionInfo) {
@@ -169,7 +251,7 @@ internal object SamsungApnCarrierBinding {
                 if (!it.moveToFirst()) null else it.getInt(0) to it.getInt(1)
             }
             if (state == null) {
-                missingRows = true
+                if (!row.optBoolean("created")) missingRows = true
                 continue // Never recreate a deleted APN or silently call it restored.
             }
             if (state.first == row.getInt("carrier")) continue

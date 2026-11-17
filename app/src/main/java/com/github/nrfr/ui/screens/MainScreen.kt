@@ -211,7 +211,7 @@ fun MainScreen(onShowAbout: () -> Unit) {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     enabled = canEdit, modifier = Modifier.fillMaxWidth(),
                 )
-                Text("修改代碼可能使 APN 清單消失、新建項目無法保存或選取，並影響行動數據。如有異常，請還原設定並依提示重新啟動手機。",
+                Text("Samsung 修改期間需保持 Nrfr 的 APN 維護服務運作。新增 APN 會使用原 SIM 的連線網路代碼；SIM 顯示代碼仍為輸入值。如有異常，請先還原原 SIM 代碼並核對行動數據。",
                     style = MaterialTheme.typography.bodySmall)
                 Text("只修改 SIM 讀取代碼。連線網路／基地台 MCC／MNC 未修改；其他 App 若使用網路資料，仍會顯示實際代碼。",
                     style = MaterialTheme.typography.bodySmall)
@@ -238,7 +238,7 @@ fun MainScreen(onShowAbout: () -> Unit) {
                             val message = buildString {
                                 append("SIM ${simCard.slot}：國家碼／名稱覆寫已提交清除。")
                                 result.restoredNumeric?.let { append("\n原 SIM 電信業者代碼已回讀確認：$it") }
-                                if (result.requiresRestart) append("\n請重新啟動手機，核對原 SIM 代碼、APN 選取與行動數據。")
+                                if (result.requiresRestart) append("\n請先核對 APN 選取與行動數據；原 SIM 代碼還原後通常不需重新啟動手機。")
                                 result.warning?.let { append("\n$it") }
                             }
                             editor = SimEditorState(subId = simCard.subId, operationMessage = message)

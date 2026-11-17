@@ -49,6 +49,9 @@ class CarrierConfigInstrumentation : Instrumentation() {
                 targetContext.packageName.endsWith(".s25")) {
                 permissions += Manifest.permission.WRITE_APN_SETTINGS
             }
+            if (request is PrivilegedCarrierConfigRunner.Request.ReconcileApns) {
+                permissions += Manifest.permission.WRITE_APN_SETTINGS
+            }
             if (request is PrivilegedCarrierConfigRunner.Request.Override) {
                 permissions += Manifest.permission.MODIFY_PHONE_STATE
                 if (request.operatorNumeric != null ||
@@ -62,6 +65,14 @@ class CarrierConfigInstrumentation : Instrumentation() {
                 ?.activeSubscriptionInfoList.orEmpty()
                 .filter { it.subscriptionId >= 0 && it.simSlotIndex >= 0 }
             when (request) {
+                PrivilegedCarrierConfigRunner.Request.ReconcileApns -> {
+                    if (SamsungApnCarrierBinding.hasAnyBackup(targetContext)) ApnMaintenanceService.ensureWatching(targetContext)
+                    var changes = 0
+                    subscriptions.filter { SamsungApnCarrierBinding.hasBackup(targetContext, it) }.forEach {
+                        changes += SamsungApnCarrierBinding.reconcileNewApns(targetContext, it)
+                    }
+                    result.putInt("apn_changes", changes)
+                }
                 PrivilegedCarrierConfigRunner.Request.ReadSimCards -> {
                     val cards = subscriptions.sortedBy { it.simSlotIndex }.map { info ->
                         val telephony = (targetContext.getSystemService(TelephonyManager::class.java) ?: error("電話服務無法使用"))
@@ -81,6 +92,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
                     if (targetContext.packageName.endsWith(".s25")) {
                         ApnResearchSnapshot.capture(targetContext, subscriptions)
                     }
+                    if (SamsungApnCarrierBinding.hasAnyBackup(targetContext)) ApnMaintenanceService.refresh(targetContext)
                     // Candidate diagnosis only: a permission denial is never an empty APN list.
                     subscriptions.forEach { info ->
                         try {
@@ -163,7 +175,8 @@ class CarrierConfigInstrumentation : Instrumentation() {
                             applyIdentity = {
                                 if (samsung && previous != null && previous.numeric != it) {
                                     SamsungCarrierRule.prepare(targetContext, info, it)
-                                    SamsungApnCarrierBinding.prepare(targetContext, info)
+                                    SamsungApnCarrierBinding.prepare(targetContext, info, it)
+                                    ApnMaintenanceService.refresh(targetContext)
                                 }
                                 CarrierIdentityAccess.apply(targetContext, info, it,
                                     request.values.getString(CarrierConfigAccess.CARRIER_NAME))
@@ -277,6 +290,9 @@ class CarrierConfigInstrumentation : Instrumentation() {
             result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_SUCCESS, false)
             result.putString(PrivilegedCarrierConfigRunner.RESULT_ERROR, error.message ?: error.javaClass.simpleName)
         } finally {
+            if (!SamsungApnCarrierBinding.hasAnyBackup(targetContext)) {
+                targetContext.stopService(android.content.Intent(targetContext, ApnMaintenanceService::class.java))
+            }
             if (delegated) {
                 try {
                     manager?.stopDelegateShellPermissionIdentity()

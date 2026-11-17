@@ -1,5 +1,38 @@
 # APN safety investigation (not a verified S25 repair)
 
+## 2026-11-17 return: existing APNs preserved; new saves still fail
+
+On the returned S25 (Android 17 / One UI 9), the operator-numeric checkbox was
+explicitly checked and only the MNC changed. The IMSI argument stayed null.
+Read-only inspection of the device's telephony implementation confirmed that
+APN database changes trigger a current-operator rewrite derived from the real
+SIM records. Repeatedly writing the synthetic numeric to `current` is not a repair.
+
+A SIM-specific carrier matching rule, scoped by the synthetic numeric and the
+full ICCID, retained the real carrier ID. Binding the existing APNs to that
+carrier ID in place preserved all four original rows, the Settings choices and
+preferred row. Their numeric and connection fields were unchanged. The other
+SIM's rows and preference were unchanged. DNS and HTTPS returned successfully
+on a Network requested and verified for the selected SIM, including after a
+data disconnect/reconnect that produced a new Network handle. Wi-Fi remained
+available for ADB but was not used by these probes.
+
+Before the next experiment, restoring the original numeric, APN carrier metadata
+and scoped rule returned both SIMs' full original rows and preferred rows exactly
+to the saved baseline, without rebooting. A bound-cellular DNS/HTTPS check also
+passed after this restore.
+
+New APN saving is still unresolved. Samsung Settings created the test row under
+the synthetic numeric, with the target subscription and slot, but its current
+flag was zero and it stayed hidden. An experimental foreground observer received
+the save event; its subsequent delegated reconciliation failed. Receiving that
+event is not evidence of a successful save repair. The experimental build passed
+68 unit tests, lint and assembly, which do not replace this failed device check.
+No release is justified by these results. Private device identifiers, row IDs,
+raw diagnostics, UI captures and signing material remain outside Git.
+
+The sections below retain earlier experiments and their limitations.
+
 The installed 1.1.4 app passes a null IMSI argument to `setCarrierTestOverride`.
 This investigation concerns the SIM operator numeric (MCC/MNC), not an IMSI change.
 

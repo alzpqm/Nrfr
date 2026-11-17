@@ -38,6 +38,7 @@ internal object PrivilegedCarrierConfigRunner {
 
     sealed interface Request {
         data object ReadSimCards : Request
+        data object ReconcileApns : Request
         data class Override(val subId: Int, val values: PersistableBundle?, val operatorNumeric: String? = null) : Request
     }
 
