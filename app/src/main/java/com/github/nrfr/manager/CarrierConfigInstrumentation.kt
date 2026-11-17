@@ -109,6 +109,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                 if (SamsungApnCurrentOperator.isRequired()) {
                                     val original = checkNotNull(restored.expectedNumeric)
                                     SamsungApnCarrierBinding.restore(targetContext, info)
+                                    SamsungCarrierRule.restore(targetContext, info)
                                     SamsungApnCurrentOperator.set(targetContext, info, original)
                                     check(ApnDiagnostics.settingsVisibleForSubscription(targetContext, info) > 0) {
                                         "原 APN 清單尚未恢復"
@@ -134,6 +135,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
                         val previous = requestedNumeric?.let { CarrierIdentityAccess.previous(targetContext, info) }
                         val samsung = SamsungApnCurrentOperator.isRequired()
                         val hadBinding = samsung && SamsungApnCarrierBinding.hasBackup(targetContext, info)
+                        val hadCarrierRule = samsung && SamsungCarrierRule.hasBackup(targetContext, info)
                         val otherSim = subscriptions.firstOrNull { it.simSlotIndex != info.simSlotIndex }
                         val originalCurrentRows = if (requestedNumeric != null && samsung)
                             ApnDiagnostics.currentFlagRows(targetContext, info) else null
@@ -160,6 +162,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
                         val persistent = CarrierApplyCoordinator(
                             applyIdentity = {
                                 if (samsung && previous != null && previous.numeric != it) {
+                                    SamsungCarrierRule.prepare(targetContext, info, it)
                                     SamsungApnCarrierBinding.prepare(targetContext, info)
                                 }
                                 CarrierIdentityAccess.apply(targetContext, info, it,
@@ -228,6 +231,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                     } finally {
                                         if (samsung) {
                                             if (!hadBinding) SamsungApnCarrierBinding.restore(targetContext, info)
+                                            if (!hadCarrierRule) SamsungCarrierRule.restore(targetContext, info)
                                             SamsungApnCurrentOperator.set(targetContext, info,
                                                 info.mccString.orEmpty() + info.mncString.orEmpty())
                                         }

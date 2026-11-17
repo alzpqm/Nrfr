@@ -141,8 +141,11 @@ internal object SamsungApnCarrierBinding {
         fun expected(name: String): Set<Long> = backup.getJSONArray(name).let { values ->
             (0 until values.length()).map { values.getLong(it) }.toSet()
         }
-        check(ids(context, "$ROOT/sim_apn_list/filtered/subId/${info.subscriptionId}") == expected("filtered")) {
-            "修改後的數據 APN 與原項目不一致，已停止修改"
+        if (ids(context, "$ROOT/sim_apn_list/filtered/subId/${info.subscriptionId}") != expected("filtered")) {
+            if (context.packageName.endsWith(".s25")) {
+                runCatching { ApnResearchSnapshot.capture(context, listOf(info), "binding-failed") }
+            }
+            error("修改後的數據 APN 與原項目不一致，已停止修改")
         }
         check(settingsIds(context, info) == expected("settings")) { "修改後 APN 顯示項目與原清單不一致" }
         check(ids(context, "$ROOT/preferapn/subId/${info.subscriptionId}") == expected("preferred")) {

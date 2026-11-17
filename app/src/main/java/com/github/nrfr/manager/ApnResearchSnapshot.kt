@@ -15,8 +15,9 @@ import java.io.File
 /** Private, read-only research export used only by the separately installed diagnostic package. */
 @TargetApi(29)
 internal object ApnResearchSnapshot {
-    fun capture(context: Context, subscriptions: List<SubscriptionInfo>) {
+    fun capture(context: Context, subscriptions: List<SubscriptionInfo>, name: String = "latest") {
         check(context.packageName.endsWith(".s25"))
+        require(name.matches(Regex("[a-zA-Z0-9_-]+")))
         val root = "content://telephony/carriers"
         val sims = JSONArray()
         subscriptions.sortedBy { it.simSlotIndex }.forEach { info ->
@@ -32,7 +33,9 @@ internal object ApnResearchSnapshot {
                 .put("defaultData", SubscriptionManager.getDefaultDataSubscriptionId() == info.subscriptionId)
             sim.put("rawOriginal", query(context, root, "numeric = ?", arrayOf(original)))
             sim.put("rawCurrent", query(context, root, "numeric = ?", arrayOf(current)))
-            sim.put("rawCarrier", query(context, root, "carrier_id = ?", arrayOf(phone.simCarrierId.toString())))
+            sim.put("rawCarrier", if (phone.simCarrierId >= 0)
+                query(context, root, "carrier_id = ?", arrayOf(phone.simCarrierId.toString()))
+                else JSONObject().put("status", "unknown_carrier"))
             sim.put("visible", query(context, "$root/sim_apn_list/${info.subscriptionId}"))
             sim.put("filtered", query(context, "$root/sim_apn_list/filtered/subId/${info.subscriptionId}"))
             sim.put("preferred", query(context, "$root/preferapn/subId/${info.subscriptionId}"))
@@ -44,9 +47,9 @@ internal object ApnResearchSnapshot {
         val snapshot = JSONObject().put("capturedAt", System.currentTimeMillis())
             .put("sdk", Build.VERSION.SDK_INT).put("sims", sims)
         val directory = checkNotNull(context.getExternalFilesDir("apn-research"))
-        val pending = File(directory, "latest.json.tmp")
+        val pending = File(directory, "$name.json.tmp")
         pending.writeText(snapshot.toString())
-        check(pending.renameTo(File(directory, "latest.json"))) { "私人 APN 診斷匯出失敗" }
+        check(pending.renameTo(File(directory, "$name.json"))) { "私人 APN 診斷匯出失敗" }
     }
 
     private fun query(context: Context, uri: String, selection: String? = null,
