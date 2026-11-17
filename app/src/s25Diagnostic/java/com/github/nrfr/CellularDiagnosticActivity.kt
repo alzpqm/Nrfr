@@ -5,8 +5,8 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.TelephonyNetworkSpecifier
 import android.os.Bundle
-import android.telephony.TelephonyNetworkSpecifier
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import com.github.nrfr.manager.PrivilegedCarrierConfigRunner

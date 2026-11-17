@@ -1,6 +1,7 @@
 package com.github.nrfr.manager
 
 import android.annotation.TargetApi
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
@@ -68,6 +69,8 @@ internal object SamsungApnCarrierBinding {
         }
     }
 
+    // Called only within the instrumentation's scoped READ_PHONE_STATE delegation.
+    @SuppressLint("MissingPermission")
     fun prepare(context: Context, info: SubscriptionInfo) {
         check(info.simSlotIndex in 0..1) { "不支援此 SIM 卡槽的 APN 關聯" }
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
