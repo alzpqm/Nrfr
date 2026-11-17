@@ -108,6 +108,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
                             restoreApnCurrent = { restored ->
                                 if (SamsungApnCurrentOperator.isRequired()) {
                                     val original = checkNotNull(restored.expectedNumeric)
+                                    SamsungApnCarrierBinding.restore(targetContext, info)
                                     SamsungApnCurrentOperator.set(targetContext, info, original)
                                     check(ApnDiagnostics.settingsVisibleForSubscription(targetContext, info) > 0) {
                                         "原 APN 清單尚未恢復"
@@ -132,6 +133,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
                         val requestedNumeric = request.operatorNumeric
                         val previous = requestedNumeric?.let { CarrierIdentityAccess.previous(targetContext, info) }
                         val samsung = SamsungApnCurrentOperator.isRequired()
+                        val hadBinding = samsung && SamsungApnCarrierBinding.hasBackup(targetContext, info)
                         val otherSim = subscriptions.firstOrNull { it.simSlotIndex != info.simSlotIndex }
                         val originalCurrentRows = if (requestedNumeric != null && samsung)
                             ApnDiagnostics.currentFlagRows(targetContext, info) else null
@@ -143,21 +145,27 @@ class CarrierConfigInstrumentation : Instrumentation() {
                             if (samsung) check(!originalCurrentRows.isNullOrEmpty()) {
                                 "目前 SIM 的 APN 電信業者狀態無法確認；代碼尚未修改"
                             }
-                            ApnSafetyGate.preflight(
-                                if (samsung) ApnDiagnostics.settingsVisibleForSubscription(targetContext, info)
-                                else ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
+                            if (samsung) {
+                                check(ApnDiagnostics.settingsVisibleForSubscription(targetContext, info) > 0) {
+                                    "目前 SIM 的 APN 清單無法確認；代碼尚未修改"
+                                }
+                            } else ApnSafetyGate.preflight(
+                                ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
                                 ApnDiagnostics.rawForNumeric(targetContext, requestedNumeric))
                         }
                         val persistent = CarrierApplyCoordinator(
                             applyIdentity = {
+                                if (samsung && previous != null && previous.numeric != it) {
+                                    SamsungApnCarrierBinding.prepare(targetContext, info)
+                                }
                                 CarrierIdentityAccess.apply(targetContext, info, it,
                                     request.values.getString(CarrierConfigAccess.CARRIER_NAME))
                                 CarrierIdentityAccess.verify(targetContext, info, it)
                                 if (previous != null && previous.numeric != it) {
-                                    if (samsung) SamsungApnCurrentOperator.set(targetContext, info, it)
                                     // The provider can reload asynchronously after the SIM property changes.
                                     repeat(6) {
                                         Thread.sleep(1_000)
+                                        if (samsung) SamsungApnCarrierBinding.verify(targetContext, info)
                                         ApnSafetyGate.afterApply(
                                             if (samsung) ApnDiagnostics.settingsVisibleForSubscription(targetContext, info)
                                             else ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
@@ -183,6 +191,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                 if (previous != null && previous.numeric != it) {
                                     repeat(3) {
                                         Thread.sleep(1_000)
+                                        if (samsung) SamsungApnCarrierBinding.verify(targetContext, info)
                                         ApnSafetyGate.afterApply(
                                             if (samsung) ApnDiagnostics.settingsVisibleForSubscription(targetContext, info)
                                             else ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
@@ -203,7 +212,11 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                     try {
                                         CarrierIdentityAccess.reapplyPrevious(targetContext, info, previous)
                                     } finally {
-                                        if (samsung) SamsungApnCurrentOperator.set(targetContext, info, previous.numeric)
+                                        if (samsung) {
+                                            if (!hadBinding) SamsungApnCarrierBinding.restore(targetContext, info)
+                                            SamsungApnCurrentOperator.set(targetContext, info,
+                                                info.mccString.orEmpty() + info.mncString.orEmpty())
+                                        }
                                     }
                                     var stableApns = 0
                                     repeat(6) { attempt ->
