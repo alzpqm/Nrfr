@@ -86,6 +86,10 @@ class CarrierConfigInstrumentation : Instrumentation() {
                             putString("network_operator", telephony.networkOperator)
                             putString("subscription_operator", info.mccString.orEmpty() + info.mncString.orEmpty())
                             putString("sim_country_iso", telephony.simCountryIso)
+                            if (targetContext.packageName.endsWith(".s25")) {
+                                putString("research_sim_key", java.security.MessageDigest.getInstance("SHA-256")
+                                    .digest(info.iccId.toByteArray()).joinToString("") { "%02x".format(it) })
+                            }
                         }
                     }
                     result.putParcelableArrayList(PrivilegedCarrierConfigRunner.RESULT_SIM_CARDS, ArrayList(cards))

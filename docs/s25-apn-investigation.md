@@ -37,8 +37,25 @@ and offers an explicit notification retry. Already-started instrumentation is
 allowed to finish releasing delegation before the runner permits another
 request. No unbounded retry was added. Assembly, lint and 68 unit tests passed.
 
-Clearing Nrfr data, resetting all APNs and long-term behavior are not verified.
-This remains a diagnostic candidate, not a claim that all S25 cases are fixed.
+### Clearing the diagnostic app's data
+
+Before this test, the sidecar exported its three recovery records to local
+private storage and successfully reimported/read them back. The diagnostic-only
+transport checks the installed package, signing certificate and current SIM
+hashes, rejects different active records and requires the shell's DUMP permission.
+It imports neither APN rows nor signing keys.
+
+Clearing only the sidecar's app data preserved both SIMs' full APN and preferred
+rows and the modified SIM numeric. Settings still showed two choices with one
+selected. Subscription-verified cellular DNS/HTTPS 204 passed after a data
+disconnect/reconnect. However, a newly saved APN was hidden again: clearing
+Nrfr data removed the maintenance state. Automatic recovery of this case remains
+unresolved. The verified private recovery records were reimported, the test APN
+deleted, and Restore returned both SIMs' original numeric/full rows/preferred
+rows exactly to baseline; the scoped rule was removed and the service stopped.
+
+Resetting all APNs and long-term behavior are not verified. This remains a
+diagnostic candidate, not a claim that all S25 cases are fixed.
 
 ## 2026-11-17 return: existing APNs preserved; new saves still fail
 
