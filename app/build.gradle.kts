@@ -14,8 +14,8 @@ android {
         applicationId = "com.github.nrfr"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12 // S25 prerelease candidate
-        versionName = "1.1.5-rc1"
+        versionCode = 13 // Existing target APN matching candidate
+        versionName = "1.1.5-rc2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -8,6 +8,10 @@
 
 ## 版本狀態
 
+**1.1.5-rc1 已確認新的套用失敗情境：** 目標代碼下若已有匹配的 MVNO APN，
+三星會優先選入該列並排除原 APN，因此套用會被精確比對攔下。正在以使用者的
+實際目標代碼驗證 rc2；先前有限路徑通過不能代表 rc1 一般可用。
+
 S25 候選版 [1.1.5-rc1](https://github.com/alzpqm/Nrfr/releases/tag/v1.1.5-rc1) 已在 Android 17／One UI 9 實測：勾選修改 SIM 電信業者代碼、保留 MCC 修改 MNC 後，APN 存檔及指定 SIM 的 DNS／HTTPS 通過；清除候選版資料後正常重開，也能自動恢復還原紀錄並再次儲存 APN。發布的是獨立套件 `com.github.nrfr.s25`，可與原版並存；使用與既有 S25 測試版相同的簽章。完整範圍及限制見[候選版說明](docs/releases/1.1.5-rc1.md)。
 
 目前正式版為 [1.1.4](https://github.com/alzpqm/Nrfr/releases/tag/v1.1.4)，恢復 1.1.2 的 MCC／MNC 提交方式，將原代碼還原與舊 APN 清理分開，不建立相容 APN。詳見[更新說明](docs/releases/1.1.4.md)。

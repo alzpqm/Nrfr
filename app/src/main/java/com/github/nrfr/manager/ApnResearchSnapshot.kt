@@ -15,7 +15,8 @@ import java.io.File
 /** Private, read-only research export used only by the separately installed diagnostic package. */
 @TargetApi(29)
 internal object ApnResearchSnapshot {
-    fun capture(context: Context, subscriptions: List<SubscriptionInfo>, name: String = "latest") {
+    fun capture(context: Context, subscriptions: List<SubscriptionInfo>, name: String = "latest",
+        requestedNumeric: String? = null) {
         check(context.packageName.endsWith(".s25"))
         require(name.matches(Regex("[a-zA-Z0-9_-]+")))
         val root = "content://telephony/carriers"
@@ -33,6 +34,10 @@ internal object ApnResearchSnapshot {
                 .put("defaultData", SubscriptionManager.getDefaultDataSubscriptionId() == info.subscriptionId)
             sim.put("rawOriginal", query(context, root, "numeric = ?", arrayOf(original)))
             sim.put("rawCurrent", query(context, root, "numeric = ?", arrayOf(current)))
+            requestedNumeric?.let {
+                require(it.matches(Regex("[0-9]{5,6}")))
+                sim.put("rawRequested", query(context, root, "numeric = ?", arrayOf(it)))
+            }
             sim.put("rawCarrier", if (phone.simCarrierId >= 0)
                 query(context, root, "carrier_id = ?", arrayOf(phone.simCarrierId.toString()))
                 else JSONObject().put("status", "unknown_carrier"))

@@ -1,5 +1,42 @@
 # S25 APN investigation and bounded device evidence
 
+## User-reported rc1 apply failure: existing target MVNO APNs
+
+The user's subsequent attempt did fail. Its saved failure snapshot showed all
+four original APNs still stored, but the requested operator numeric already had
+seven APNs. One user-edited IMSI-type MVNO row matched and became the sole
+filtered data APN, excluding every original row and the original preferred ID.
+This time the requested numeric changed MCC as well; the earlier successful
+MNC-only target did not exercise this conflict. Rollback returned the original
+numeric and four filtered original rows. The failure is not a permission-denied
+empty-list result, nor proof of deletion or an IMSI override.
+
+The installed Samsung provider classifies rows into mutually exclusive buckets:
+matched MVNO before MNO, then candidate and carrier-ID handling. Binding an
+original MNO to the real carrier ID does not defeat a matching target MVNO.
+Removing the equality check would conceal a real data-profile selection error.
+
+The rc2 candidate journals the target rows' original matching metadata before
+temporarily assigning each a unique nonmatching ICCID condition. Item IDs,
+numeric, connection fields and existing edited states are retained. Both forward
+and reverse unique-key checks use the row's current fields. Restoration retains
+external connection edits and soft-delete markers, and never recreates deleted
+rows. Another active SIM's use of these rows blocks this operation. The same
+phone-service matching API used by this provider verifies the condition is false.
+
+Initial rc2 device evidence using the exact failed target and the user's
+unchanged default-data SIM: the numeric checkbox was checked, apply completed,
+and the four original filtered and Settings IDs were retained. All seven target
+rows remained; only mvno_type and mvno_match_data changed. The original preferred
+ID and its connection fields stayed unchanged (carrier_id changed as intended).
+The other SIM's full original rows/preference stayed unchanged and its bound
+DNS/HTTPS 204 passed. Local tests increased to 75 and lint/assembly passed.
+
+The device then went offline before new-save and full-restoration verification.
+Those checks remain pending; rc2 is not published on this evidence. The exact
+three recovery records, including the seven target-row entries, are saved
+privately. Raw logs, numeric values, SIM identifiers and UI captures stay local.
+
 ## Wired return: Nightzuku and recovery after clearing app data
 
 The S25 ran Android 17 / One UI 9 and its installed Nightzuku

@@ -54,8 +54,10 @@ internal object SamsungApnCarrierBinding {
         }
     }
 
-    private fun contentFingerprint(row: Map<String, String?>): String {
-        val ignored = setOf("carrier_id", "edited", "current", "current1")
+    private val matchIgnored = setOf("mvno_type", "mvno_match_data", "edited", "current", "current1")
+
+    private fun contentFingerprint(row: Map<String, String?>,
+        ignored: Set<String> = setOf("carrier_id", "edited", "current", "current1")): String {
         val canonical = JSONArray()
         row.toSortedMap().filterKeys { it !in ignored }.forEach { (column, value) ->
             canonical.put(JSONArray().put(column).put(value ?: JSONObject.NULL))
@@ -70,7 +72,8 @@ internal object SamsungApnCarrierBinding {
     fun preferredIds(context: Context, info: SubscriptionInfo): Set<Long> =
         ids(context, "$ROOT/preferapn/subId/${info.subscriptionId}")
 
-    private fun checkNoConflict(context: Context, id: Long, destinationCarrier: Int, numeric: String? = null) {
+    private fun checkNoConflict(context: Context, id: Long, destinationCarrier: Int, numeric: String? = null,
+        matching: Pair<String?, String?>? = null) {
         val cursor = context.contentResolver.query(Uri.parse("$ROOT/$id"), uniqueColumns.toTypedArray(), null, null, null)
             ?: error("APN 唯一鍵查詢失敗")
         val values = cursor.use {
@@ -81,6 +84,8 @@ internal object SamsungApnCarrierBinding {
                     "numeric" -> numeric ?: it.getString(index)
                     "mcc" -> numeric?.take(3) ?: it.getString(index)
                     "mnc" -> numeric?.drop(3) ?: it.getString(index)
+                    "mvno_type" -> if (matching != null) matching.first else it.getString(index)
+                    "mvno_match_data" -> if (matching != null) matching.second else it.getString(index)
                     else -> it.getString(index)
                 }
             }
@@ -94,6 +99,101 @@ internal object SamsungApnCarrierBinding {
         }
         check(ids(context, ROOT, selection.joinToString(" AND "), args.toTypedArray()).isEmpty()) {
             "APN 關聯存在唯一鍵衝突，未執行此列更新；備份已保留"
+        }
+    }
+
+    private fun matchesIccid(phone: TelephonyManager, numeric: String, pattern: String): Boolean {
+        // This device's provider maps ICCID to 3 and calls this same phone-service API.
+        val method = TelephonyManager::class.java.getMethod("matchesCurrentSimOperator",
+            String::class.java, Int::class.javaPrimitiveType, String::class.java)
+        return method.invoke(phone, numeric, 3, pattern) as Boolean
+    }
+
+    private fun nullable(entry: JSONObject, name: String): String? =
+        if (entry.isNull(name)) null else entry.getString(name)
+
+    /** A target-numeric MVNO can exclude every real APN; a target MNO can also join them.
+     * Retain these rows, but put their matching metadata in the nonmatching bucket while
+     * this SIM override is active. The durable journal precedes every item update. */
+    @SuppressLint("MissingPermission")
+    private fun competition(context: Context, info: SubscriptionInfo, testNumeric: String,
+        original: String, phone: TelephonyManager): JSONArray {
+        val candidates = ids(context, ROOT, "numeric = ? AND edited NOT IN (2,3,5,6)", arrayOf(testNumeric))
+        val subscriptions = context.getSystemService(SubscriptionManager::class.java).activeSubscriptionInfoList.orEmpty()
+        subscriptions.filter { it.subscriptionId != info.subscriptionId }.forEach { other ->
+            val otherPhone = context.getSystemService(TelephonyManager::class.java).createForSubscriptionId(other.subscriptionId)
+            check(otherPhone.simOperator != testNumeric &&
+                candidates.intersect(filteredIds(context, other) + settingsIds(context, other) + preferredIds(context, other)).isEmpty()) {
+                "目標代碼的 APN 正由另一張 SIM 使用，未修改匹配條件"
+            }
+        }
+        val entries = JSONArray()
+        candidates.sorted().forEach { id ->
+            val before = readRow(context, id)
+            val marker = ApnMatchingMetadata.marker(key(info), id)
+            check(!matchesIccid(phone, original, marker)) { "無法隔離目標 APN 的匹配條件" }
+            val carrier = checkNotNull(before["carrier_id"]).toInt()
+            checkNoConflict(context, id, carrier, matching = "iccid" to marker)
+            entries.put(JSONObject().put("id", id).put("mvnoType", before["mvno_type"] ?: JSONObject.NULL)
+                .put("mvnoData", before["mvno_match_data"] ?: JSONObject.NULL)
+                .put("edited", before["edited"] ?: JSONObject.NULL).put("marker", marker)
+                .put("fingerprint", contentFingerprint(before, matchIgnored)))
+        }
+        return entries
+    }
+
+    private fun applyCompetition(context: Context, entries: JSONArray) {
+        for (index in 0 until entries.length()) {
+            val entry = entries.getJSONObject(index)
+            val id = entry.getLong("id")
+            val before = readRow(context, id)
+            check(before["mvno_type"] == nullable(entry, "mvnoType") &&
+                before["mvno_match_data"] == nullable(entry, "mvnoData") &&
+                contentFingerprint(before, matchIgnored) == entry.getString("fingerprint")) {
+                "目標 APN 已被編輯，匹配條件尚未修改"
+            }
+            checkNoConflict(context, id, checkNotNull(before["carrier_id"]).toInt(),
+                matching = "iccid" to entry.getString("marker"))
+            val values = ContentValues().apply {
+                put("mvno_type", "iccid"); put("mvno_match_data", entry.getString("marker"))
+                put("edited", before["edited"])
+            }
+            check(context.contentResolver.update(Uri.parse("$ROOT/$id"), values, null, null) == 1) {
+                "目標 APN 匹配條件更新未確認"
+            }
+            val after = readRow(context, id)
+            check(after == before + mapOf("mvno_type" to "iccid", "mvno_match_data" to entry.getString("marker"))) {
+                "目標 APN 其他欄位回讀不一致，備份已保留"
+            }
+        }
+    }
+
+    private fun restoreCompetition(context: Context, entries: JSONArray) {
+        for (index in 0 until entries.length()) {
+            val entry = entries.getJSONObject(index)
+            val id = entry.getLong("id")
+            if (ids(context, ROOT, "_id = ?", arrayOf(id.toString())).isEmpty()) continue
+            val before = readRow(context, id)
+            val originalType = nullable(entry, "mvnoType")
+            val originalData = nullable(entry, "mvnoData")
+            val restore = ApnMatchingMetadata.restore(before["mvno_type"], before["mvno_match_data"],
+                originalType, originalData, entry.getString("marker"))
+            if (!restore) continue // Journal written, but this row was never changed.
+            // Recompute the reverse unique key using the user's current connection fields.
+            checkNoConflict(context, id, checkNotNull(before["carrier_id"]).toInt(),
+                matching = originalType to originalData)
+            val edited = ApnMatchingMetadata.restoredEdited(before["edited"], nullable(entry, "edited"),
+                contentFingerprint(before, matchIgnored) == entry.getString("fingerprint"))
+            val values = ContentValues().apply {
+                put("mvno_type", originalType); put("mvno_match_data", originalData); put("edited", edited)
+            }
+            check(context.contentResolver.update(Uri.parse("$ROOT/$id"), values, null, null) == 1) {
+                "目標 APN 原匹配條件還原未確認"
+            }
+            check(readRow(context, id) == before + mapOf("mvno_type" to originalType,
+                "mvno_match_data" to originalData, "edited" to edited)) {
+                "目標 APN 原匹配條件回讀不一致，備份已保留"
+            }
         }
     }
 
@@ -150,8 +250,13 @@ internal object SamsungApnCarrierBinding {
             .put("preexisting", JSONArray(ids(context, ROOT, "numeric = ?", arrayOf(testNumeric)).toList()))
             .put("filtered", JSONArray(filtered.toList())).put("settings", JSONArray(settings.toList()))
             .put("preferred", JSONArray(preferred.toList()))
+            .put("competition", competition(context, info, testNumeric, original, telephony))
+        if (context.packageName.endsWith(".s25")) {
+            ApnResearchSnapshot.capture(context, subscriptions, "before-binding", testNumeric)
+        }
         check(NightzukuRecoveryStore.put(context, PREFS, simKey, backup.toString())) { "原 APN 關聯備份失敗" }
         try {
+            applyCompetition(context, backup.getJSONArray("competition"))
             rows.filter { it.carrier != carrier }.forEach { row ->
                 checkNoConflict(context, row.id, carrier)
                 val values = ContentValues().apply { put("carrier_id", carrier); put("edited", row.edited) }
@@ -256,6 +361,14 @@ internal object SamsungApnCarrierBinding {
         val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(key(info), null)
             ?: error("APN 關聯備份不存在")
         val backup = JSONObject(saved)
+        val phone = context.getSystemService(TelephonyManager::class.java).createForSubscriptionId(info.subscriptionId)
+        backup.optJSONArray("competition")?.let { entries ->
+            for (index in 0 until entries.length()) {
+                check(!matchesIccid(phone, backup.getString("testNumeric"), entries.getJSONObject(index).getString("marker"))) {
+                    "目標 APN 匹配隔離未生效，已停止修改"
+                }
+            }
+        }
         fun expected(name: String): Set<Long> = backup.getJSONArray(name).let { values ->
             (0 until values.length()).map { values.getLong(it) }.toSet()
         }
@@ -271,11 +384,13 @@ internal object SamsungApnCarrierBinding {
         }
     }
 
+    @SuppressLint("MissingPermission")
     fun restore(context: Context, info: SubscriptionInfo) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val simKey = key(info)
         val saved = prefs.getString(simKey, null) ?: return
         val backup = JSONObject(saved)
+        backup.optJSONArray("competition")?.let { restoreCompetition(context, it) }
         val rows = backup.getJSONArray("rows")
         var missingRows = false
         for (index in 0 until rows.length()) {
@@ -295,9 +410,9 @@ internal object SamsungApnCarrierBinding {
             checkNoConflict(context, row.getLong("id"), row.getInt("carrier"))
             // Undo the test's metadata only when all APN content is back at its original
             // value. Keep the user's edited marker when any connection/name field changed.
-            val edited = if (row.has("contentFingerprint") &&
-                row.getString("contentFingerprint") == contentFingerprint(readRow(context, row.getLong("id"))))
-                row.getInt("edited") else state.second
+            val edited = checkNotNull(ApnMatchingMetadata.restoredEdited(state.second.toString(), row.getInt("edited").toString(),
+                row.has("contentFingerprint") &&
+                    row.getString("contentFingerprint") == contentFingerprint(readRow(context, row.getLong("id"))))).toInt()
             val values = ContentValues().apply { put("carrier_id", row.getInt("carrier")); put("edited", edited) }
             check(context.contentResolver.update(uri, values, null, null) == 1) { "原 APN 關聯還原未確認" }
             context.contentResolver.query(uri, arrayOf("carrier_id"), null, null, null)?.use {
@@ -305,6 +420,11 @@ internal object SamsungApnCarrierBinding {
             } ?: error("原 APN 關聯回讀失敗")
         }
         check(!missingRows) { "部分原 APN 已被刪除；現存項目關聯已還原，備份已保留" }
+        if (context.packageName.endsWith(".s25")) {
+            ApnResearchSnapshot.capture(context,
+                context.getSystemService(SubscriptionManager::class.java).activeSubscriptionInfoList.orEmpty(),
+                "binding-restored", backup.optString("testNumeric").takeIf { it.isNotEmpty() })
+        }
         check(NightzukuRecoveryStore.remove(context, PREFS, simKey)) { "APN 已還原，關聯備份清理失敗" }
     }
 }
