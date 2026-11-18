@@ -20,6 +20,21 @@ import org.json.JSONObject
 internal object CarrierIdentityAccess {
     private const val PREFS = "carrier_identity_originals"
 
+    data class Previous(val numeric: String, val spn: String?)
+
+    fun previous(context: Context, info: SubscriptionInfo): Previous {
+        val telephony = context.getSystemService(TelephonyManager::class.java)
+            .createForSubscriptionId(info.subscriptionId)
+        return Previous(OperatorNumeric.parse(telephony.simOperator.orEmpty()).value,
+            telephony.simOperatorName)
+    }
+
+    fun reapplyPrevious(context: Context, info: SubscriptionInfo, previous: Previous) {
+        assertPresent(context, info)
+        set(service(), info.subscriptionId, previous.numeric, previous.spn)
+        verify(context, info, previous.numeric)
+    }
+
     private fun service(): Any {
         val binder = ServiceManager.getService(Context.TELEPHONY_SERVICE) ?: error("電話服務無法使用")
         return Class.forName("com.android.internal.telephony.ITelephony\$Stub")
@@ -44,7 +59,7 @@ internal object CarrierIdentityAccess {
             val original = telephony.simOperator.orEmpty()
             check(OperatorNumeric.isValid(original)) { "無法讀取原本的電信業者代碼，尚未執行覆寫；請確認 SIM 已就緒" }
             val backup = JSONObject().put("numeric", original).put("name", telephony.simOperatorName.orEmpty())
-            check(prefs.edit().putString(simKey, backup.toString()).commit()) { "無法備份原本的電信設定，尚未執行覆寫" }
+            check(NightzukuRecoveryStore.put(context, PREFS, simKey, backup.toString())) { "無法備份原本的電信設定，尚未執行覆寫" }
         }
         assertPresent(context, info)
         set(service(), info.subscriptionId, code, displayName ?: telephony.simOperatorName)
@@ -113,9 +128,11 @@ internal object CarrierIdentityAccess {
     }
 
     fun completeRestore(context: Context, info: SubscriptionInfo, result: IdentityRestoreResult) {
-        if (result.expectedNumeric != null && !result.requiresRestart) {
+        // The coordinator calls this only after repeated identity readback and completed
+        // APN/rule cleanup. Reapplying the original numeric does not require a reboot.
+        if (result.expectedNumeric != null) {
             key(info)?.let { simKey ->
-                check(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(simKey).commit()) {
+                check(NightzukuRecoveryStore.remove(context, PREFS, simKey)) {
                     "設定已還原，但備份清理失敗"
                 }
             }

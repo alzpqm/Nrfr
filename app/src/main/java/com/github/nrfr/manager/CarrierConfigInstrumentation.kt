@@ -39,25 +39,52 @@ class CarrierConfigInstrumentation : Instrumentation() {
             }
             val deadline = SystemClock.elapsedRealtime() + 3_000L
             while (!Shizuku.pingBinder() && SystemClock.elapsedRealtime() < deadline) Thread.sleep(100)
-            check(Shizuku.pingBinder()) { "Shizuku 未執行" }
+            check(Shizuku.pingBinder()) { "Nightzuku／Shizuku 未執行" }
             manager = PrivilegedCarrierConfigRunner.activityManager()
             val permissions = mutableListOf(
                 Manifest.permission.READ_PHONE_STATE,
                 "android.permission.READ_PRIVILEGED_PHONE_STATE",
             )
+            if (request is PrivilegedCarrierConfigRunner.Request.ReadSimCards && Build.VERSION.SDK_INT >= 30) {
+                permissions += Manifest.permission.READ_PRECISE_PHONE_STATE
+            }
+            if (request is PrivilegedCarrierConfigRunner.Request.ReadSimCards &&
+                targetContext.packageName.endsWith(".s25")) {
+                permissions += Manifest.permission.WRITE_APN_SETTINGS
+            }
+            if (request is PrivilegedCarrierConfigRunner.Request.ReconcileApns) {
+                permissions += Manifest.permission.WRITE_APN_SETTINGS
+            }
             if (request is PrivilegedCarrierConfigRunner.Request.Override) {
                 permissions += Manifest.permission.MODIFY_PHONE_STATE
+                if (request.operatorNumeric != null ||
+                    (request.values == null && SamsungApnCurrentOperator.isRequired())) {
+                    permissions += Manifest.permission.WRITE_APN_SETTINGS
+                }
             }
             manager.startDelegateShellPermissionIdentity(Process.myUid(), permissions.toTypedArray())
             delegated = true
             val subscriptions = targetContext.getSystemService(SubscriptionManager::class.java)
                 ?.activeSubscriptionInfoList.orEmpty()
                 .filter { it.subscriptionId >= 0 && it.simSlotIndex >= 0 }
+            NightzukuRecoveryStore.restoreLocal(targetContext, subscriptions.map { info ->
+                java.security.MessageDigest.getInstance("SHA-256").digest(info.iccId.toByteArray())
+                    .joinToString("") { "%02x".format(it) }
+            }.toSet())
             when (request) {
+                PrivilegedCarrierConfigRunner.Request.ReconcileApns -> {
+                    if (SamsungApnCarrierBinding.hasAnyBackup(targetContext)) ApnMaintenanceService.ensureWatching(targetContext)
+                    var changes = 0
+                    subscriptions.filter { SamsungApnCarrierBinding.hasBackup(targetContext, it) }.forEach {
+                        changes += SamsungApnCarrierBinding.reconcileNewApns(targetContext, it)
+                    }
+                    result.putInt("apn_changes", changes)
+                }
                 PrivilegedCarrierConfigRunner.Request.ReadSimCards -> {
                     val cards = subscriptions.sortedBy { it.simSlotIndex }.map { info ->
                         val telephony = (targetContext.getSystemService(TelephonyManager::class.java) ?: error("電話服務無法使用"))
                             .createForSubscriptionId(info.subscriptionId)
+                        val ims = ImsRegistrationAccess.read(targetContext, info.subscriptionId)
                         Bundle().apply {
                             putInt("slot", info.simSlotIndex + 1)
                             putInt("sub_id", info.subscriptionId)
@@ -67,9 +94,28 @@ class CarrierConfigInstrumentation : Instrumentation() {
                             putString("network_operator", telephony.networkOperator)
                             putString("subscription_operator", info.mccString.orEmpty() + info.mncString.orEmpty())
                             putString("sim_country_iso", telephony.simCountryIso)
+                            putInt("ims_registration_state", ims.state)
+                            putInt("ims_registration_transport", ims.transport)
+                            if (targetContext.packageName.endsWith(".s25")) {
+                                putString("research_sim_key", java.security.MessageDigest.getInstance("SHA-256")
+                                    .digest(info.iccId.toByteArray()).joinToString("") { "%02x".format(it) })
+                            }
                         }
                     }
                     result.putParcelableArrayList(PrivilegedCarrierConfigRunner.RESULT_SIM_CARDS, ArrayList(cards))
+                    if (targetContext.packageName.endsWith(".s25")) {
+                        ApnResearchSnapshot.capture(targetContext, subscriptions)
+                    }
+                    if (SamsungApnCarrierBinding.hasAnyBackup(targetContext)) ApnMaintenanceService.refresh(targetContext)
+                    // Candidate diagnosis only: a permission denial is never an empty APN list.
+                    subscriptions.forEach { info ->
+                        try {
+                            Log.i("NrfrApnDiag", "slot=${info.simSlotIndex + 1} " +
+                                ApnDiagnostics.summary(targetContext, info))
+                        } catch (_: Exception) {
+                            Log.i("NrfrApnDiag", "slot=${info.simSlotIndex + 1} diagnosis_failed")
+                        }
+                    }
                 }
                 is PrivilegedCarrierConfigRunner.Request.Override -> {
                     val info = subscriptions.firstOrNull { it.subscriptionId == request.subId }
@@ -85,6 +131,17 @@ class CarrierConfigInstrumentation : Instrumentation() {
                                 }
                             },
                             verifyIdentity = { CarrierIdentityAccess.verify(targetContext, info, it) },
+                            restoreApnCurrent = { restored ->
+                                if (SamsungApnCurrentOperator.isRequired()) {
+                                    val original = checkNotNull(restored.expectedNumeric)
+                                    SamsungApnCarrierBinding.restore(targetContext, info)
+                                    SamsungCarrierRule.restore(targetContext, info)
+                                    SamsungApnCurrentOperator.set(targetContext, info, original)
+                                    check(ApnDiagnostics.settingsVisibleForSubscription(targetContext, info) > 0) {
+                                        "原 APN 清單尚未恢復"
+                                    }
+                                }
+                            },
                             cleanupApns = { restored ->
                                 if (CarrierIdentityAccess.hasLegacyApns(targetContext, info)) {
                                     // Request APN permissions only after the identity is confirmed.
@@ -98,19 +155,147 @@ class CarrierConfigInstrumentation : Instrumentation() {
                         result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_PERSISTENT, report.persistent)
                         result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_REQUIRES_RESTART, report.requiresRestart)
                         result.putString(PrivilegedCarrierConfigRunner.RESULT_RESTORED_NUMERIC, report.restoredNumeric)
-                        result.putString(PrivilegedCarrierConfigRunner.RESULT_WARNING, report.warning)
+                        val storageWarning = if (arguments?.getBoolean(PrivilegedCarrierConfigRunner.ARG_RECOVERY_UNAVAILABLE) == true)
+                            "原代碼還原已執行；Nightzuku 還原紀錄目前不可用，請核對 APN 狀態。" else null
+                        result.putString(PrivilegedCarrierConfigRunner.RESULT_WARNING,
+                            listOfNotNull(report.warning, storageWarning).takeIf { it.isNotEmpty() }?.joinToString("\n"))
                     } else {
+                        val requestedNumeric = request.operatorNumeric
+                        val previous = requestedNumeric?.let { CarrierIdentityAccess.previous(targetContext, info) }
+                        val samsung = SamsungApnCurrentOperator.isRequired()
+                        val hadBinding = samsung && SamsungApnCarrierBinding.hasBackup(targetContext, info)
+                        val hadCarrierRule = samsung && SamsungCarrierRule.hasBackup(targetContext, info)
+                        val otherSim = subscriptions.firstOrNull { it.simSlotIndex != info.simSlotIndex }
+                        val originalCurrentRows = if (requestedNumeric != null && samsung)
+                            ApnDiagnostics.currentFlagRows(targetContext, info) else null
+                        val otherCurrentRows = if (requestedNumeric != null && samsung && otherSim != null)
+                            ApnDiagnostics.currentFlagRows(targetContext, otherSim) else null
+                        val otherFilteredRows = if (requestedNumeric != null && samsung && otherSim != null)
+                            SamsungApnCarrierBinding.filteredIds(targetContext, otherSim) else null
+                        val otherPreferredRows = if (requestedNumeric != null && samsung && otherSim != null)
+                            SamsungApnCarrierBinding.preferredIds(targetContext, otherSim) else null
+                        val otherSettingsCount = if (requestedNumeric != null && samsung && otherSim != null)
+                            ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) else null
+                        if (requestedNumeric != null && previous != null && previous.numeric != requestedNumeric) {
+                            if (samsung) check(!originalCurrentRows.isNullOrEmpty()) {
+                                "目前 SIM 的 APN 電信業者狀態無法確認；代碼尚未修改"
+                            }
+                            if (samsung) {
+                                check(ApnDiagnostics.settingsVisibleForSubscription(targetContext, info) > 0) {
+                                    "目前 SIM 的 APN 清單無法確認；代碼尚未修改"
+                                }
+                            } else ApnSafetyGate.preflight(
+                                ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
+                                ApnDiagnostics.rawForNumeric(targetContext, requestedNumeric))
+                        }
                         val persistent = CarrierApplyCoordinator(
                             applyIdentity = {
+                                if (samsung && previous != null && previous.numeric != it) {
+                                    SamsungCarrierRule.prepare(targetContext, info, it)
+                                    SamsungApnCarrierBinding.prepare(targetContext, info, it)
+                                    ApnMaintenanceService.refresh(targetContext)
+                                }
                                 CarrierIdentityAccess.apply(targetContext, info, it,
                                     request.values.getString(CarrierConfigAccess.CARRIER_NAME))
+                                CarrierIdentityAccess.verify(targetContext, info, it)
+                                if (previous != null && previous.numeric != it) {
+                                    // The provider can reload asynchronously after the SIM property changes.
+                                    repeat(6) {
+                                        Thread.sleep(1_000)
+                                        if (samsung) SamsungApnCarrierBinding.verify(targetContext, info)
+                                        ApnSafetyGate.afterApply(
+                                            if (samsung) ApnDiagnostics.settingsVisibleForSubscription(targetContext, info)
+                                            else ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
+                                            ApnDiagnostics.filteredForSubscription(targetContext, info.subscriptionId))
+                                    }
+                                    if (otherSim != null && otherSettingsCount != null) check(
+                                        ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) == otherSettingsCount) {
+                                        "另一張 SIM 的 APN 清單已改變"
+                                    }
+                                    if (otherSim != null && otherCurrentRows != null) check(
+                                        ApnDiagnostics.currentFlagRows(targetContext, otherSim) == otherCurrentRows) {
+                                        "另一張 SIM 的 APN 電信業者狀態已改變"
+                                    }
+                                    if (otherSim != null && otherFilteredRows != null && otherPreferredRows != null) check(
+                                        SamsungApnCarrierBinding.filteredIds(targetContext, otherSim) == otherFilteredRows &&
+                                        SamsungApnCarrierBinding.preferredIds(targetContext, otherSim) == otherPreferredRows) {
+                                        "另一張 SIM 的數據 APN 或選取已改變"
+                                    }
+                                }
                             },
                             applyConfig = {
                                 CarrierOverridePolicy.apply(Build.VERSION.SDK_INT, false) {
                                     CarrierConfigAccess.override(request.subId, request.values, it, asShell = false)
                                 }
                             },
-                            verify = { verifyConfig(request.subId, request.values, it) },
+                            verify = {
+                                verifyConfig(request.subId, request.values, it)
+                                if (previous != null && previous.numeric != it) {
+                                    repeat(3) {
+                                        Thread.sleep(1_000)
+                                        if (samsung) SamsungApnCarrierBinding.verify(targetContext, info)
+                                        ApnSafetyGate.afterApply(
+                                            if (samsung) ApnDiagnostics.settingsVisibleForSubscription(targetContext, info)
+                                            else ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId),
+                                            ApnDiagnostics.filteredForSubscription(targetContext, info.subscriptionId))
+                                    }
+                                    if (otherSim != null && otherSettingsCount != null) check(
+                                        ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) == otherSettingsCount) {
+                                        "另一張 SIM 的 APN 清單已改變"
+                                    }
+                                    if (otherSim != null && otherCurrentRows != null) check(
+                                        ApnDiagnostics.currentFlagRows(targetContext, otherSim) == otherCurrentRows) {
+                                        "另一張 SIM 的 APN 電信業者狀態已改變"
+                                    }
+                                    if (otherSim != null && otherFilteredRows != null && otherPreferredRows != null) check(
+                                        SamsungApnCarrierBinding.filteredIds(targetContext, otherSim) == otherFilteredRows &&
+                                        SamsungApnCarrierBinding.preferredIds(targetContext, otherSim) == otherPreferredRows) {
+                                        "另一張 SIM 的數據 APN 或選取已改變"
+                                    }
+                                }
+                            },
+                            rollbackIdentity = {
+                                if (previous != null && previous.numeric != requestedNumeric) {
+                                    try {
+                                        CarrierIdentityAccess.reapplyPrevious(targetContext, info, previous)
+                                    } finally {
+                                        if (samsung) {
+                                            if (!hadBinding) SamsungApnCarrierBinding.restore(targetContext, info)
+                                            if (!hadCarrierRule) SamsungCarrierRule.restore(targetContext, info)
+                                            SamsungApnCurrentOperator.set(targetContext, info,
+                                                info.mccString.orEmpty() + info.mncString.orEmpty())
+                                        }
+                                    }
+                                    var stableApns = 0
+                                    repeat(6) { attempt ->
+                                        val visible = if (samsung)
+                                            ApnDiagnostics.settingsVisibleForSubscription(targetContext, info)
+                                        else ApnDiagnostics.visibleForSubscription(targetContext, info.subscriptionId)
+                                        val filtered = ApnDiagnostics.filteredForSubscription(targetContext,
+                                            info.subscriptionId)
+                                        stableApns = if (visible > 0 && filtered > 0) stableApns + 1 else 0
+                                        if (attempt < 5) Thread.sleep(1_000)
+                                    }
+                                    check(stableApns >= 3) { "原 APN 清單尚未穩定恢復" }
+                                    if (originalCurrentRows != null) check(
+                                        ApnDiagnostics.currentFlagRows(targetContext, info) == originalCurrentRows) {
+                                        "原 APN 電信業者狀態尚未恢復"
+                                    }
+                                    if (otherSim != null && otherSettingsCount != null) check(
+                                        ApnDiagnostics.settingsVisibleForSubscription(targetContext, otherSim) == otherSettingsCount) {
+                                        "另一張 SIM 的 APN 清單尚未恢復"
+                                    }
+                                    if (otherSim != null && otherCurrentRows != null) check(
+                                        ApnDiagnostics.currentFlagRows(targetContext, otherSim) == otherCurrentRows) {
+                                        "另一張 SIM 的 APN 電信業者狀態尚未恢復"
+                                    }
+                                    if (otherSim != null && otherFilteredRows != null && otherPreferredRows != null) check(
+                                        SamsungApnCarrierBinding.filteredIds(targetContext, otherSim) == otherFilteredRows &&
+                                        SamsungApnCarrierBinding.preferredIds(targetContext, otherSim) == otherPreferredRows) {
+                                        "另一張 SIM 的數據 APN 或選取尚未恢復"
+                                    }
+                                }
+                            },
                         ).apply(request.operatorNumeric, !request.values.isEmpty)
                         result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_PERSISTENT, persistent)
                     }
@@ -122,6 +307,9 @@ class CarrierConfigInstrumentation : Instrumentation() {
             result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_SUCCESS, false)
             result.putString(PrivilegedCarrierConfigRunner.RESULT_ERROR, error.message ?: error.javaClass.simpleName)
         } finally {
+            if (!SamsungApnCarrierBinding.hasAnyBackup(targetContext)) {
+                targetContext.stopService(android.content.Intent(targetContext, ApnMaintenanceService::class.java))
+            }
             if (delegated) {
                 try {
                     manager?.stopDelegateShellPermissionIdentity()

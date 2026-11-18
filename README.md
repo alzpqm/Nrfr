@@ -1,12 +1,29 @@
 # Nrfr — Android 17 相容版
 
-透過 **Shizuku、免 root** 調整系統回報的 SIM 國家碼、電信業者名稱及 MCC／MNC，支援各 SIM 分別套用及還原，提供正體中文介面。
+透過 **Nightzuku／Shizuku 相容介面、免 root** 調整系統回報的 SIM 國家碼、電信業者名稱及 MCC／MNC，支援各 SIM 分別套用及還原，提供正體中文介面。S25 Android 17 候選版使用 Nightzuku 官方 SDK，真機驗證使用 Nightzuku。
 
 由 **Nrfr 維護團隊** 維護，基於 [Ackites/Nrfr](https://github.com/Ackites/Nrfr)。
 
 [下載正式版](https://github.com/alzpqm/Nrfr/releases/latest) · [回報問題](https://github.com/alzpqm/Nrfr/issues) · [原始碼](https://github.com/alzpqm/Nrfr)
 
 ## 版本狀態
+
+**S25 1.1.5-rc4** 顯示各 SIM 的 IMS 通話註冊狀態。三星 Android 17 修改代碼時，
+可在確認畫面選擇僅套用國家碼與名稱，或繼續測試 MCC/MNC 覆寫。
+三星在本次實測中使用覆寫值推導 IMS 網域，會造成兩張 SIM 註冊失敗。
+詳見 [IMS 調查與實測紀錄](docs/releases/1.1.5-rc4.md)。
+
+**S25 1.1.5-rc3** 處理三星對特定 SIM 採用固定 APN 查找代碼時的套用失敗。
+已用使用者原先失敗的 SIM2 預設驗證提交、儲存 APN、行動數據重連與還原，
+期間保留 SIM1 已有的覆寫。詳見 [rc3 實測紀錄](docs/releases/1.1.5-rc3.md)。
+
+**1.1.5-rc1 已確認新的套用失敗情境：** 目標代碼下若已有匹配的 MVNO APN，
+三星會優先選入該列並排除原 APN，因此套用會被精確比對攔下。修補版
+1.1.5-rc2 已以實際失敗的目標代碼安裝並通過此衝突、清除資料後存檔、
+指定 SIM 數據重連與完整還原驗證；GitHub Release 尚未建立。
+詳見 [rc2 說明](docs/releases/1.1.5-rc2.md)。先前有限路徑通過不能代表 rc1 一般可用。
+
+S25 候選版 [1.1.5-rc1](https://github.com/alzpqm/Nrfr/releases/tag/v1.1.5-rc1) 已在 Android 17／One UI 9 實測：勾選修改 SIM 電信業者代碼、保留 MCC 修改 MNC 後，APN 存檔及指定 SIM 的 DNS／HTTPS 通過；清除候選版資料後正常重開，也能自動恢復還原紀錄並再次儲存 APN。發布的是獨立套件 `com.github.nrfr.s25`，可與原版並存；使用與既有 S25 測試版相同的簽章。完整範圍及限制見[候選版說明](docs/releases/1.1.5-rc1.md)。
 
 目前正式版為 [1.1.4](https://github.com/alzpqm/Nrfr/releases/tag/v1.1.4)，恢復 1.1.2 的 MCC／MNC 提交方式，將原代碼還原與舊 APN 清理分開，不建立相容 APN。詳見[更新說明](docs/releases/1.1.4.md)。
 
@@ -27,10 +44,10 @@
 
 ## 使用
 
-1. 安裝 APK，啟動 Shizuku 並授權 Nrfr。
+1. 安裝 APK 並授權 Nrfr；S25 Android 17 候選版啟動 Nightzuku，其他版本依其相容介面使用。
 2. 選擇 SIM，讀取目前設定。
 3. 選擇國家碼及業者名稱；若需修改代碼，勾選「修改 SIM 電信業者代碼」並輸入 5／6 位代碼。點選「套用設定」，核對操作結果、APN 與行動數據。
-4. 如需清除覆寫，選擇同一張 SIM，點選「還原設定」，依提示重新啟動手機並核對原代碼、APN 選取及行動數據。
+4. 如需清除覆寫，選擇同一張 SIM，點選「還原設定」，核對原代碼、APN 選取及行動數據。S25 本次實測無需重啟即可恢復；其他未清除的持久覆寫依實際提示處理。
 
 1.1.4 沿用 1.1.1 起的固定發布簽章，可覆蓋安裝 1.1.1／1.1.2／1.1.3／1.1.4 候選版，保留本機備份；請勿為升級先解除安裝。1.0.4／1.1.0 測試 APK 的簽章不同，移除前須先還原並依提示重啟。
 

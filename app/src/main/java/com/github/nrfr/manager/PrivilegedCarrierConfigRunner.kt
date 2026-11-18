@@ -20,12 +20,15 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import rikka.shizuku.Shizuku
 import rikka.shizuku.ShizukuBinderWrapper
 
 internal object PrivilegedCarrierConfigRunner {
     const val ARG_TOKEN = "request_token"
     const val ARG_PID = "caller_pid"
+    const val ARG_RECOVERY_UNAVAILABLE = "recovery_unavailable"
     const val RESULT_SUCCESS = "success"
     const val RESULT_ERROR = "error"
     const val RESULT_PERSISTENT = "persistent"
@@ -38,6 +41,7 @@ internal object PrivilegedCarrierConfigRunner {
 
     sealed interface Request {
         data object ReadSimCards : Request
+        data object ReconcileApns : Request
         data class Override(val subId: Int, val values: PersistableBundle?, val operatorNumeric: String? = null) : Request
     }
 
@@ -59,13 +63,21 @@ internal object PrivilegedCarrierConfigRunner {
 
     suspend fun run(context: Context, request: Request): Bundle = withContext(Dispatchers.IO) {
         mutex.withLock {
-            check(Shizuku.pingBinder()) { "Shizuku 未執行" }
+            check(Shizuku.pingBinder()) { "Nightzuku／Shizuku 未執行" }
             check(Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-                "請重新授予 Shizuku 權限"
+                "請重新授予 Nightzuku／Shizuku 權限"
             }
             check(activeResult?.isCompleted != false) {
                 "上一次操作仍未結束，請稍後重試或重新啟動應用程式"
             }
+            var recoveryUnavailable = false
+            try { NightzukuRecoveryStore.prepare(context) } catch (failure: Exception) {
+                // An unavailable backup store must never prevent the phone service from
+                // restoring the original numeric. New identity writes require storage.
+                if (request is Request.Override && request.operatorNumeric != null) throw failure
+                recoveryUnavailable = true
+            }
+            currentCoroutineContext().ensureActive()
             val token = requests.add(Process.myPid(), request)
             val component = ComponentName(context, CarrierConfigInstrumentation::class.java)
             val result = CompletableDeferred<Bundle>()
@@ -85,6 +97,7 @@ internal object PrivilegedCarrierConfigRunner {
                 val arguments = Bundle().apply {
                     putString(ARG_TOKEN, token)
                     putInt(ARG_PID, Process.myPid())
+                    putBoolean(ARG_RECOVERY_UNAVAILABLE, recoveryUnavailable)
                 }
                 started = activityManager().startInstrumentation(
                     component, null, INSTR_FLAG_NO_RESTART, arguments, watcher,
