@@ -14,8 +14,8 @@ android {
         applicationId = "com.github.nrfr"
         minSdk = 26
         targetSdk = 37
-        versionCode = 14 // Samsung per-SIM APN lookup candidate
-        versionName = "1.1.5-rc3"
+        versionCode = 15 // Samsung IMS registration and explicit numeric test path
+        versionName = "1.1.5-rc4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

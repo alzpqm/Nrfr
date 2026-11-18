@@ -45,6 +45,9 @@ class CarrierConfigInstrumentation : Instrumentation() {
                 Manifest.permission.READ_PHONE_STATE,
                 "android.permission.READ_PRIVILEGED_PHONE_STATE",
             )
+            if (request is PrivilegedCarrierConfigRunner.Request.ReadSimCards && Build.VERSION.SDK_INT >= 30) {
+                permissions += Manifest.permission.READ_PRECISE_PHONE_STATE
+            }
             if (request is PrivilegedCarrierConfigRunner.Request.ReadSimCards &&
                 targetContext.packageName.endsWith(".s25")) {
                 permissions += Manifest.permission.WRITE_APN_SETTINGS
@@ -81,6 +84,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
                     val cards = subscriptions.sortedBy { it.simSlotIndex }.map { info ->
                         val telephony = (targetContext.getSystemService(TelephonyManager::class.java) ?: error("電話服務無法使用"))
                             .createForSubscriptionId(info.subscriptionId)
+                        val ims = ImsRegistrationAccess.read(targetContext, info.subscriptionId)
                         Bundle().apply {
                             putInt("slot", info.simSlotIndex + 1)
                             putInt("sub_id", info.subscriptionId)
@@ -90,6 +94,8 @@ class CarrierConfigInstrumentation : Instrumentation() {
                             putString("network_operator", telephony.networkOperator)
                             putString("subscription_operator", info.mccString.orEmpty() + info.mncString.orEmpty())
                             putString("sim_country_iso", telephony.simCountryIso)
+                            putInt("ims_registration_state", ims.state)
+                            putInt("ims_registration_transport", ims.transport)
                             if (targetContext.packageName.endsWith(".s25")) {
                                 putString("research_sim_key", java.security.MessageDigest.getInstance("SHA-256")
                                     .digest(info.iccId.toByteArray()).joinToString("") { "%02x".format(it) })
