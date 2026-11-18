@@ -32,10 +32,31 @@ ID and its connection fields stayed unchanged (carrier_id changed as intended).
 The other SIM's full original rows/preference stayed unchanged and its bound
 DNS/HTTPS 204 passed. Local tests increased to 75 and lint/assembly passed.
 
-The device then went offline before new-save and full-restoration verification.
-Those checks remain pending; rc2 is not published on this evidence. The exact
-three recovery records, including the seven target-row entries, are saved
-privately. Raw logs, numeric values, SIM identifiers and UI captures stay local.
+After reconnecting, new APN saving passed. Clearing only the candidate's app
+data and normally reopening restored all three records exactly, including the
+seven target-row entries, without manual import. A second distinct APN saved
+and appeared after clear. The initial second fixture reused the first APN's
+connection key, correctly failed the collision check without replacing either
+row, and passed after editing to a distinct APN value. Pending maintenance
+returned to success on that save event.
+
+The exact failed target remained active while SIM 1's subscription-verified
+cellular DNS/HTTPS 204 passed. Both temporary rows were deleted by their exact
+IDs, never selected. Data disable/enable then produced a new Network handle and
+the bound DNS/HTTPS checks passed again. Wi-Fi remained available for ADB and
+was excluded from these requests.
+
+Full Restore without reboot returned both SIMs' original numerics, complete raw
+APN rows and complete preferred rows exactly to baseline. Every field of all
+seven target-numeric rows matched the before-binding snapshot. The exact
+inserted carrier rule ID was absent; native rules under this real operator
+numeric were retained. All three durable record groups were empty and the
+maintenance service stopped. Raw logs, numeric values, SIM identifiers and UI
+captures remain local. Both SIMs' three country/name fields, original default
+data SIM, screen timeout, USB stay-awake and the original Zhuyin input mode
+were restored and verified. The restored default SIM passed bound DNS/HTTPS
+204. The installed APK hash matched the signed rc2 artifact. See the rc2 notes
+for publication status and limits.
 
 ## Wired return: Nightzuku and recovery after clearing app data
 
