@@ -18,13 +18,13 @@ fun ShizukuNotReadyScreen() {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "需要 Shizuku 權限",
+            text = "需要 Nightzuku／Shizuku 連線與授權",
             style = MaterialTheme.typography.headlineMedium
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "請安裝並啟用 Shizuku，然後重新啟動應用程式",
+            text = "Android 17 請先啟動 Nightzuku，再授予 Nrfr 存取權限。服務啟動後請重新開啟 Nrfr。",
             style = MaterialTheme.typography.bodyLarge
         )
     }
-} 
+}

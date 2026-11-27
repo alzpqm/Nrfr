@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
             android:name=".NrfrApplication"
@@ -32,10 +34,15 @@
                 android:enabled="true"
                 android:exported="true"
                 android:permission="android.permission.INTERACT_ACROSS_USERS_FULL"/>
+        <service android:name=".manager.ApnMaintenanceService" android:exported="false"
+                 android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                      android:value="User initiated SIM operator override: preserve and reconcile this SIM's saved APNs until restore" />
+        </service>
     </application>
 
     <instrumentation
-            android:name=".manager.CarrierConfigInstrumentation"
+            android:name="com.github.nrfr.manager.CarrierConfigInstrumentation"
             android:targetPackage="${applicationId}"/>
 
 </manifest>

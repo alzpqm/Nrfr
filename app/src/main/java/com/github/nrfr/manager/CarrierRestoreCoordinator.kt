@@ -16,6 +16,7 @@ internal class CarrierRestoreCoordinator(
     private val restoreIdentity: () -> IdentityRestoreResult,
     private val clearConfig: () -> Boolean,
     private val verifyIdentity: (String) -> Unit,
+    private val restoreApnCurrent: (IdentityRestoreResult) -> Unit = {},
     private val cleanupApns: (IdentityRestoreResult) -> Unit,
     private val completeRestore: (IdentityRestoreResult) -> Unit,
 ) {
@@ -44,11 +45,12 @@ internal class CarrierRestoreCoordinator(
         } else {
             var cleanupComplete = false
             try {
+                restoreApnCurrent(identity)
                 cleanupApns(identity)
                 cleanupComplete = true
             } catch (_: Exception) {
                 // Do not turn a confirmed identity restore into a failure or erase its backup.
-                warnings += "原 SIM 代碼已回讀確認；舊 APN 相容項目尚未清理完成，備份已保留。請重啟後核對 APN，再執行還原。"
+                warnings += "原 SIM 代碼已回讀確認；APN 狀態尚未確認還原，備份已保留。請核對 APN，再執行還原。"
             }
             try { verifyIdentity(identity.expectedNumeric) } catch (_: Exception) {
                 error("還原後系統重新載入電信設定，原 SIM 代碼回讀尚未確認；備份已保留，請重新啟動手機後核對")

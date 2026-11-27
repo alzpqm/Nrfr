@@ -12,6 +12,8 @@ class CarrierApplyCoordinatorTest {
         var identityFailure = false
         var configFailure = false
         var rejectNumeric = false
+        var verifyFailure = false
+        var rollbackFailure = false
         val events = mutableListOf<String>()
         fun apply(code: String?, hasConfig: Boolean = true) = CarrierApplyCoordinator(
             applyIdentity = {
@@ -29,8 +31,14 @@ class CarrierApplyCoordinatorTest {
             },
             verify = {
                 events += "verify"
+                check(!verifyFailure)
                 check(it == null || it == numeric)
                 check(!hasConfig || country == savedCountry)
+            },
+            rollbackIdentity = {
+                events += "rollback"
+                check(!rollbackFailure)
+                numeric = "998002"
             },
         ).apply(code, hasConfig)
     }
@@ -76,7 +84,7 @@ class CarrierApplyCoordinatorTest {
         val device = Device().apply { identityFailure = true }
         assertThrows(IllegalStateException::class.java) { device.apply("99901") }
         assertEquals("998002", device.numeric)
-        assertEquals(listOf("identity"), device.events)
+        assertEquals(listOf("identity", "rollback"), device.events)
     }
 
     @Test fun aNumericReadbackMismatchCannotBeReportedAsSuccess() {
@@ -85,10 +93,24 @@ class CarrierApplyCoordinatorTest {
         assertEquals("998002", device.numeric)
     }
 
-    @Test fun aConfigFailureKeepsTheSubmittedIdentityAndReportsFailure() {
+    @Test fun aConfigFailureRestoresThePreviousIdentity() {
         val device = Device().apply { configFailure = true }
         assertThrows(IllegalStateException::class.java) { device.apply("99901") }
+        assertEquals("998002", device.numeric)
+        assertEquals(listOf("identity", "config", "rollback"), device.events)
+    }
+
+    @Test fun aPostApplyVerificationFailureRestoresThePreviousIdentity() {
+        val device = Device().apply { verifyFailure = true }
+        assertThrows(IllegalStateException::class.java) { device.apply("99901") }
+        assertEquals("998002", device.numeric)
+        assertEquals(listOf("identity", "config", "verify", "rollback"), device.events)
+    }
+
+    @Test fun aRollbackFailureIsReportedExplicitly() {
+        val device = Device().apply { configFailure = true; rollbackFailure = true }
+        val error = assertThrows(IllegalStateException::class.java) { device.apply("99901") }
+        assertTrue(error.message.orEmpty().contains("自動還原尚未確認"))
         assertEquals("99901", device.numeric)
-        assertEquals(listOf("identity", "config"), device.events)
     }
 }

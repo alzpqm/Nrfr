@@ -3,9 +3,13 @@
     <cloud-backup>
         <exclude domain="sharedpref" path="carrier_identity_originals.xml"/>
         <exclude domain="sharedpref" path="apn_override_recovery.xml"/>
+        <exclude domain="sharedpref" path="samsung_apn_carrier_binding.xml"/>
+        <exclude domain="sharedpref" path="samsung_sim_test_carrier_rules.xml"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="carrier_identity_originals.xml"/>
         <exclude domain="sharedpref" path="apn_override_recovery.xml"/>
+        <exclude domain="sharedpref" path="samsung_apn_carrier_binding.xml"/>
+        <exclude domain="sharedpref" path="samsung_sim_test_carrier_rules.xml"/>
     </device-transfer>
 </data-extraction-rules>

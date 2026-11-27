@@ -1,4 +1,14 @@
-# Android 17 / Shizuku 相容修復
+# Android 17 / Nightzuku 相容方式
+
+## S25 與 Nightzuku
+
+1.1.5 使用官方 `io.github.kerneldroid:api:13.2.1` 與 `provider:13.2.1`，
+保留 `rikka.shizuku` 相容命名空間。S25 Android 17 請啟動 Nightzuku。
+官方依賴資訊見 [Nightzuku 發布頁](https://github.com/kerneldroid/Nightzuku/releases)。
+
+電話設定使用下述同進程 instrumentation 權限委派。三星 APN 維護另委派
+`WRITE_APN_SETTINGS`，查詢權限遭拒時會顯示錯誤。Nightzuku UserService
+在裝置上保存固定範圍的還原資料。
 
 ## 相容性處理
 

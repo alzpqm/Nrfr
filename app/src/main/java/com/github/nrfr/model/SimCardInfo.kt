@@ -8,5 +8,7 @@ data class SimCardInfo(
     val simOperator: String = "",
     val networkOperator: String = "",
     val subscriptionOperator: String = "",
-    val simCountryIso: String = ""
-) 
+    val simCountryIso: String = "",
+    val imsRegistrationState: Int = -1,
+    val imsRegistrationTransport: Int = -1,
+)

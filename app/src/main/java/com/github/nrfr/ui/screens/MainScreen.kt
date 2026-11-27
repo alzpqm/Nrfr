@@ -2,6 +2,8 @@ package com.github.nrfr.ui.screens
 
 import android.widget.Toast
 import android.os.Build
+import android.telephony.AccessNetworkConstants
+import android.telephony.ims.RegistrationManager
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,6 +33,15 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+private data class ApplySettings(
+    val sim: SimCardInfo,
+    val countryCode: String,
+    val carrierName: String?,
+    val numeric: String?,
+) {
+    val hasDisplaySettings: Boolean get() = countryCode.isNotEmpty() || !carrierName.isNullOrEmpty()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(onShowAbout: () -> Unit) {
@@ -43,10 +54,43 @@ fun MainScreen(onShowAbout: () -> Unit) {
     var simCards by remember { mutableStateOf<List<SimCardInfo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isApplying by remember { mutableStateOf(false) }
+    var pendingImsConfirmation by remember { mutableStateOf<ApplySettings?>(null) }
     var simError by remember { mutableStateOf<String?>(null) }
     val selectedSimCard = simCards.find { it.subId == editor.subId }
     val canEdit = selectedSimCard != null && !isLoading && !isApplying
     val scope = rememberCoroutineScope()
+
+    fun submit(settings: ApplySettings) {
+        val (sim, countryCode, carrierName, numeric) = settings
+        editor = editor.copy(operationMessage = null, changeNumeric = numeric != null)
+        isApplying = true
+        scope.launch {
+            try {
+                val result = CarrierConfigManager.setCarrierConfig(context, sim.subId, countryCode, carrierName, numeric)
+                val verified = Build.VERSION.SDK_INT >= 29
+                val message = buildString {
+                    append("SIM ${sim.slot}：${if (verified) "以下讀取值已回讀確認" else "以下設定已提交"}。")
+                    if (countryCode.isNotEmpty()) append("\nSIM 國家碼：${countryCode.lowercase(Locale.ROOT)}")
+                    carrierName?.let { append("\n電信業者名稱：$it") }
+                    numeric?.let {
+                        append("\nSIM 電信業者代碼：$it")
+                        append("\n請核對 IMS 通話、APN 與行動數據。若 IMS 失去註冊，請還原原代碼。")
+                    }
+                    append(if (result.persistent) "\n設定已儲存。" else "\n重新啟動、更換 SIM 或系統重載後可能需要重新套用。")
+                }
+                editor = editor.copy(operationMessage = message)
+                Toast.makeText(context, "SIM ${sim.slot}：${if (verified) "回讀已確認" else "設定已提交"}", Toast.LENGTH_LONG).show()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                editor = editor.copy(operationMessage = "SIM ${sim.slot} 套用失敗：${error.message}")
+                Toast.makeText(context, editor.operationMessage, Toast.LENGTH_LONG).show()
+            } finally {
+                isApplying = false
+                refreshTrigger += 1
+            }
+        }
+    }
 
     LaunchedEffect(context, refreshTrigger) {
         isLoading = true
@@ -63,6 +107,38 @@ fun MainScreen(onShowAbout: () -> Unit) {
         } finally {
             isLoading = false
         }
+    }
+
+    pendingImsConfirmation?.let { settings ->
+        val originalNumericActive = settings.sim.simOperator.isNotEmpty() &&
+            settings.sim.simOperator == settings.sim.subscriptionOperator
+        val keepOriginal = originalNumericActive && settings.hasDisplaySettings
+        AlertDialog(
+            onDismissRequest = { pendingImsConfirmation = null },
+            title = { Text("SIM ${settings.sim.slot} 的 IMS 通話") },
+            text = {
+                Text(buildString {
+                    append("三星會用 SIM 代碼建立 IMS 註冊。修改代碼可能讓 VoLTE 和 Wi-Fi 通話失去註冊。")
+                    if (!originalNumericActive) append("\n\n若要恢復原代碼，請返回並選擇「還原設定」。")
+                })
+            },
+            confirmButton = {
+                if (keepOriginal) {
+                    TextButton(onClick = {
+                        pendingImsConfirmation = null
+                        submit(settings.copy(numeric = null))
+                    }) { Text("僅套用國家碼與名稱") }
+                } else {
+                    TextButton(onClick = { pendingImsConfirmation = null }) { Text("返回") }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingImsConfirmation = null
+                    submit(settings)
+                }) { Text("繼續修改代碼") }
+            },
+        )
     }
 
     Scaffold(
@@ -122,7 +198,7 @@ fun MainScreen(onShowAbout: () -> Unit) {
 
             // 顯示目前選中的 SIM 卡的設定資訊
             selectedSimCard?.let { simCard ->
-                CurrentConfigCard(simCard = simCard)
+                CurrentConfigCard(simCard = simCard, canRefresh = canEdit, onRefresh = { refreshTrigger += 1 })
             }
 
             editor.operationMessage?.let { message ->
@@ -211,9 +287,7 @@ fun MainScreen(onShowAbout: () -> Unit) {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     enabled = canEdit, modifier = Modifier.fillMaxWidth(),
                 )
-                Text("修改代碼可能使 APN 清單消失、新建項目無法保存或選取，並影響行動數據。如有異常，請還原設定並依提示重新啟動手機。",
-                    style = MaterialTheme.typography.bodySmall)
-                Text("只修改 SIM 讀取代碼。連線網路／基地台 MCC／MNC 未修改；其他 App 若使用網路資料，仍會顯示實際代碼。",
+                Text("Samsung 修改期間需保持 Nrfr 的 APN 維護服務運作。新增 APN 會使用原 SIM 的連線網路代碼；SIM 顯示代碼仍為輸入值。如有異常，請先還原原 SIM 代碼並核對行動數據。",
                     style = MaterialTheme.typography.bodySmall)
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -238,7 +312,7 @@ fun MainScreen(onShowAbout: () -> Unit) {
                             val message = buildString {
                                 append("SIM ${simCard.slot}：國家碼／名稱覆寫已提交清除。")
                                 result.restoredNumeric?.let { append("\n原 SIM 電信業者代碼已回讀確認：$it") }
-                                if (result.requiresRestart) append("\n請重新啟動手機，核對原 SIM 代碼、APN 選取與行動數據。")
+                                if (result.requiresRestart) append("\n請先核對 APN 選取與行動數據；原 SIM 代碼還原後通常不需重新啟動手機。")
                                 result.warning?.let { append("\n$it") }
                             }
                             editor = SimEditorState(subId = simCard.subId, operationMessage = message)
@@ -262,37 +336,11 @@ fun MainScreen(onShowAbout: () -> Unit) {
                     }
                     val countryCode = if (editor.isCustomCountryCode) editor.customCountryCode else editor.selectedCountryCode
                     val chosenNumeric = if (editor.changeNumeric) editor.operatorNumeric.trim() else null
-                    editor = editor.copy(operationMessage = null)
-                    isApplying = true
-                    scope.launch {
-                        try {
-                            val result = CarrierConfigManager.setCarrierConfig(
-                                context, simCard.subId, countryCode, carrierName, chosenNumeric,
-                            )
-                            val verified = Build.VERSION.SDK_INT >= 29
-                            val message = buildString {
-                                append("SIM ${simCard.slot}：${if (verified) "以下讀取值已回讀確認" else "以下設定已提交"}。")
-                                if (countryCode.isNotEmpty()) append("\nSIM 國家碼：${countryCode.lowercase(Locale.ROOT)}")
-                                carrierName?.let { append("\n電信業者名稱：$it") }
-                                chosenNumeric?.let {
-                                    append("\nSIM 電信業者代碼：$it")
-                                    append("\n連線網路／基地台 MCC／MNC 未修改。")
-                                    append("\n此回讀結果不代表 APN 或行動數據正常；若有異常，請還原設定。")
-                                }
-                                append(if (result.persistent) "\n設定已儲存。" else "\n重新啟動、更換 SIM 或系統重載後可能需要重新套用。")
-                            }
-                            editor = editor.copy(operationMessage = message)
-                            Toast.makeText(context, "SIM ${simCard.slot}：${if (verified) "回讀已確認" else "設定已提交"}", Toast.LENGTH_LONG).show()
-                        } catch (error: CancellationException) {
-                            throw error
-                        } catch (error: Exception) {
-                            editor = editor.copy(operationMessage = "SIM ${simCard.slot} 套用失敗：${error.message}")
-                            Toast.makeText(context, editor.operationMessage, Toast.LENGTH_LONG).show()
-                        } finally {
-                            isApplying = false
-                            refreshTrigger += 1
-                        }
-                    }
+                    val settings = ApplySettings(simCard, countryCode, carrierName, chosenNumeric)
+                    if (Build.MANUFACTURER.equals("samsung", ignoreCase = true) && Build.VERSION.SDK_INT >= 37 &&
+                        chosenNumeric != null && chosenNumeric != simCard.subscriptionOperator) {
+                        pendingImsConfirmation = settings
+                    } else submit(settings)
                 }
             )
         }
@@ -361,7 +409,7 @@ private fun SimCardSelector(
 }
 
 @Composable
-private fun CurrentConfigCard(simCard: SimCardInfo) {
+private fun CurrentConfigCard(simCard: SimCardInfo, canRefresh: Boolean, onRefresh: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -383,6 +431,22 @@ private fun CurrentConfigCard(simCard: SimCardInfo) {
             Text("連線網路代碼（未修改）：${simCard.networkOperator.ifEmpty { "未連線／未取得" }}")
             Text("SIM、訂閱資料與連線網路是不同讀取來源；只核對已選擇修改的 SIM 讀取值。",
                 style = MaterialTheme.typography.bodySmall)
+            if (Build.VERSION.SDK_INT >= 30) {
+                val imsStatus = when (simCard.imsRegistrationState) {
+                    RegistrationManager.REGISTRATION_STATE_REGISTERED -> when (simCard.imsRegistrationTransport) {
+                        AccessNetworkConstants.TRANSPORT_TYPE_WWAN -> "已註冊（行動網路）"
+                        AccessNetworkConstants.TRANSPORT_TYPE_WLAN -> "已註冊（Wi-Fi）"
+                        else -> "已註冊"
+                    }
+                    RegistrationManager.REGISTRATION_STATE_REGISTERING -> "註冊中"
+                    RegistrationManager.REGISTRATION_STATE_NOT_REGISTERED -> "未註冊"
+                    else -> "無法讀取"
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("IMS 通話：$imsStatus", modifier = Modifier.weight(1f))
+                    TextButton(onClick = onRefresh, enabled = canRefresh) { Text("重新讀取") }
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
             if (simCard.currentConfig.isEmpty()) {
                 Text(

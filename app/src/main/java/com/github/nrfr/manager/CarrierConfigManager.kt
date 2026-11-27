@@ -38,7 +38,8 @@ object CarrierConfigManager {
             SimCardInfo(it.getInt("slot"), it.getInt("sub_id"), it.getString("carrier_name").orEmpty(),
                 CarrierConfigAccess.displayConfig(config), it.getString("sim_operator").orEmpty(),
                 it.getString("network_operator").orEmpty(), it.getString("subscription_operator").orEmpty(),
-                it.getString("sim_country_iso").orEmpty())
+                it.getString("sim_country_iso").orEmpty(), it.getInt("ims_registration_state", -1),
+                it.getInt("ims_registration_transport", -1))
         }
     }
 

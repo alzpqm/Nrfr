@@ -1,5 +1,13 @@
 # 正式版簽章與發布
 
+## S25 版 1.1.5
+
+`:app:assembleS25Release` 建置套件 `com.github.nrfr.s25`，沿用此套件的既有發布憑證。
+它可覆蓋同套件的舊版，並與 `com.github.nrfr` 並存。發布檔包含 APK 與 SHA-256
+校驗值。S25 套件在維護者環境簽署，私鑰及密碼保留在本機私人目錄。
+
+## 1.1.4 及先前正式版
+
 1.1.1 起使用固定的 RSA 發布金鑰，簽章 alias 為 `nrfr-release`。發布的是 R8／資源縮減的 release APK，非 debug APK。
 
 正式版憑證 SHA-256：`64f5cde8ff7b2e5a1496941249c9c0c355744936fb6b11f19bbc65ac3830e469`。這是公開的憑證指紋，不包含私鑰；後續更新應使用相同憑證。
