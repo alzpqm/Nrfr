@@ -1,19 +1,14 @@
 # Android 17 / Nightzuku 相容方式
 
-## S25 候選版 1.1.5-rc1
+## S25 與 Nightzuku
 
-此裝置使用 Nightzuku，候選版依賴官方 `io.github.kerneldroid:api:13.2.1` 與
-`provider:13.2.1`，保留 `rikka.shizuku` 相容命名空間。不能把 Java 套件名稱當作
-要求安裝原版 Shizuku；本次使用已安裝的 Nightzuku r53，沒有替換 broker。
+1.1.5 使用官方 `io.github.kerneldroid:api:13.2.1` 與 `provider:13.2.1`，
+保留 `rikka.shizuku` 相容命名空間。S25 Android 17 請啟動 Nightzuku。
 官方依賴資訊見 [Nightzuku 發布頁](https://github.com/kerneldroid/Nightzuku/releases)。
 
-電話設定仍使用下述同進程 instrumentation 權限委派；三星 APN 修改／復原另委派
-`WRITE_APN_SETTINGS`，權限拒絕不視為空清單。候選版另用 shell UID 2000 的
-Nightzuku UserService 保存固定範圍的還原 metadata，不經任意 shell 命令。
-清除 Nrfr 資料後正常重開的恢復、指定 SIM 的 DNS／HTTPS 及無重啟還原已在
-S25 驗證；完整範圍見[候選版說明](releases/1.1.5-rc1.md)。
-
-以下保留 1.1.4 的通用調用鏈與限制；涉及 APN 與持久儲存的候選版行為以上述說明為準。
+電話設定使用下述同進程 instrumentation 權限委派。三星 APN 維護另委派
+`WRITE_APN_SETTINGS`，查詢權限遭拒時會顯示錯誤。Nightzuku UserService
+在裝置上保存固定範圍的還原資料。
 
 ## 相容性處理
 

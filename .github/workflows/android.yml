@@ -39,7 +39,7 @@ jobs:
           cmdline-tools-version: '16111833'
       - run: sdkmanager 'platforms;android-37.2' 'build-tools;37.0.0'
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease :app:assembleS25Diagnostic
+      - run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease :app:assembleS25Release
       - name: Summarize unit tests
         shell: bash
         run: |
@@ -70,5 +70,5 @@ jobs:
           path: app/build/outputs/apk/release/app-release-unsigned.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: nrfr-s25-sidecar-unsigned
-          path: app/build/outputs/apk/s25Diagnostic/app-s25Diagnostic-unsigned.apk
+          name: nrfr-s25-release-unsigned
+          path: app/build/outputs/apk/s25Release/app-s25Release-unsigned.apk

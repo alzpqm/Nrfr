@@ -136,7 +136,7 @@ fun MainScreen(onShowAbout: () -> Unit) {
                 TextButton(onClick = {
                     pendingImsConfirmation = null
                     submit(settings)
-                }) { Text("繼續測試代碼") }
+                }) { Text("繼續修改代碼") }
             },
         )
     }

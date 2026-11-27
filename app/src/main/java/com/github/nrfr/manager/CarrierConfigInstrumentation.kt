@@ -49,7 +49,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
                 permissions += Manifest.permission.READ_PRECISE_PHONE_STATE
             }
             if (request is PrivilegedCarrierConfigRunner.Request.ReadSimCards &&
-                targetContext.packageName.endsWith(".s25")) {
+                SamsungApnCurrentOperator.isRequired()) {
                 permissions += Manifest.permission.WRITE_APN_SETTINGS
             }
             if (request is PrivilegedCarrierConfigRunner.Request.ReconcileApns) {
@@ -74,11 +74,9 @@ class CarrierConfigInstrumentation : Instrumentation() {
             when (request) {
                 PrivilegedCarrierConfigRunner.Request.ReconcileApns -> {
                     if (SamsungApnCarrierBinding.hasAnyBackup(targetContext)) ApnMaintenanceService.ensureWatching(targetContext)
-                    var changes = 0
                     subscriptions.filter { SamsungApnCarrierBinding.hasBackup(targetContext, it) }.forEach {
-                        changes += SamsungApnCarrierBinding.reconcileNewApns(targetContext, it)
+                        SamsungApnCarrierBinding.reconcileNewApns(targetContext, it)
                     }
-                    result.putInt("apn_changes", changes)
                 }
                 PrivilegedCarrierConfigRunner.Request.ReadSimCards -> {
                     val cards = subscriptions.sortedBy { it.simSlotIndex }.map { info ->
@@ -96,26 +94,10 @@ class CarrierConfigInstrumentation : Instrumentation() {
                             putString("sim_country_iso", telephony.simCountryIso)
                             putInt("ims_registration_state", ims.state)
                             putInt("ims_registration_transport", ims.transport)
-                            if (targetContext.packageName.endsWith(".s25")) {
-                                putString("research_sim_key", java.security.MessageDigest.getInstance("SHA-256")
-                                    .digest(info.iccId.toByteArray()).joinToString("") { "%02x".format(it) })
-                            }
                         }
                     }
                     result.putParcelableArrayList(PrivilegedCarrierConfigRunner.RESULT_SIM_CARDS, ArrayList(cards))
-                    if (targetContext.packageName.endsWith(".s25")) {
-                        ApnResearchSnapshot.capture(targetContext, subscriptions)
-                    }
                     if (SamsungApnCarrierBinding.hasAnyBackup(targetContext)) ApnMaintenanceService.refresh(targetContext)
-                    // Candidate diagnosis only: a permission denial is never an empty APN list.
-                    subscriptions.forEach { info ->
-                        try {
-                            Log.i("NrfrApnDiag", "slot=${info.simSlotIndex + 1} " +
-                                ApnDiagnostics.summary(targetContext, info))
-                        } catch (_: Exception) {
-                            Log.i("NrfrApnDiag", "slot=${info.simSlotIndex + 1} diagnosis_failed")
-                        }
-                    }
                 }
                 is PrivilegedCarrierConfigRunner.Request.Override -> {
                     val info = subscriptions.firstOrNull { it.subscriptionId == request.subId }
@@ -303,7 +285,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
             }
             result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_SUCCESS, true)
         } catch (error: Throwable) {
-            Log.e("NrfrCarrierConfig", "CarrierConfig operation failed", error)
+            Log.e("NrfrCarrierConfig", "CarrierConfig operation failed (${error.javaClass.simpleName})")
             result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_SUCCESS, false)
             result.putString(PrivilegedCarrierConfigRunner.RESULT_ERROR, error.message ?: error.javaClass.simpleName)
         } finally {
@@ -314,7 +296,7 @@ class CarrierConfigInstrumentation : Instrumentation() {
                 try {
                     manager?.stopDelegateShellPermissionIdentity()
                 } catch (error: Exception) {
-                    Log.e("NrfrCarrierConfig", "Permission delegation cleanup failed", error)
+                    Log.e("NrfrCarrierConfig", "Permission delegation cleanup failed (${error.javaClass.simpleName})")
                     result.putBoolean(PrivilegedCarrierConfigRunner.RESULT_SUCCESS, false)
                     result.putString(PrivilegedCarrierConfigRunner.RESULT_ERROR, "權限清理失敗，請重新啟動應用程式並核對目前設定")
                 }

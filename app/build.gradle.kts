@@ -14,8 +14,8 @@ android {
         applicationId = "com.github.nrfr"
         minSdk = 26
         targetSdk = 37
-        versionCode = 15 // Samsung IMS registration and explicit numeric test path
-        versionName = "1.1.5-rc4"
+        versionCode = 16
+        versionName = "1.1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -26,10 +26,9 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
-        create("s25Diagnostic") {
+        create("s25Release") {
             initWith(getByName("release"))
             applicationIdSuffix = ".s25"
-            versionNameSuffix = "-s25"
             matchingFallbacks += listOf("release")
         }
     }
